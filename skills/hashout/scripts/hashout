@@ -1,0 +1,290 @@
+#!/bin/sh
+# hashout: turn-taking debate between agents through one append-only Markdown file.
+# POSIX sh and core tools only; works on macOS and Linux.
+set -u
+
+usage() {
+  cat <<'EOF'
+usage:
+  hashout init --title T (--topic TEXT | --topic-file F) [--participants N] [--rounds R]
+               [--minutes M] [--turn-minutes M] [--rule unanimous|majority] [--root DIR]
+  hashout join FILE --harness H [--model M]
+  hashout wait FILE --seat N [--timeout SEC] [--interval SEC]
+  hashout post FILE --seat N [--body-file F]    (reads the body from stdin otherwise)
+  hashout skip FILE --seat N
+  hashout status FILE
+  hashout close FILE agreed|deadlocked --seat N
+
+wait exit codes: 0 your turn, 1 closed, 2 deadline or round limit reached,
+3 timed out (run wait again), 4 the seat whose turn it is went silent (you may skip),
+5 you are marked absent.
+EOF
+}
+
+die() { echo "hashout: $*" >&2; exit 64; }
+now() { date +%s; }
+is_int() { case "$1" in ''|*[!0-9]*) return 1 ;; *) return 0 ;; esac; }
+utc() { date -u -r "$1" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -d "@$1" +%Y-%m-%dT%H:%M:%SZ; }
+
+LOCKED=
+lock() {
+  i=0
+  while ! mkdir "$1.lock" 2>/dev/null; do
+    i=$((i + 1))
+    [ "$i" -ge 100 ] && die "lock busy: $1.lock (remove it if no agent is writing)"
+    sleep 0.1
+  done
+  LOCKED="$1.lock"
+  trap 'rmdir "$LOCKED" 2>/dev/null' EXIT INT TERM
+}
+unlock() { rmdir "$LOCKED" 2>/dev/null; LOCKED=; trap - EXIT INT TERM; }
+
+# First "key: value" header line in the file.
+meta() { sed -n "s/^$1: //p" "$F" | head -n 1; }
+
+# Parse the file into shell variables. Only numbers and seat lists are printed, so eval is safe.
+load() {
+  [ -f "$F" ] || { echo "hashout: no such debate file: $F" >&2; exit 66; }
+  N=$(meta participants); ROUNDS=$(meta rounds); TURN_MIN=$(meta turn-minutes)
+  DEADLINE=$(meta deadline | cut -d' ' -f1); RULE=$(meta rule)
+  if grep -q '^\[CLOSED ' "$F"; then CLOSED=1; else CLOSED=0; fi
+  is_int "$N" && is_int "$ROUNDS" && is_int "$DEADLINE" && is_int "$TURN_MIN" || die "not a hashout file: $F"
+  eval "$(awk -v N="$N" '
+    function stamp(   m) { if (match($0, /@[0-9]+/)) return substr($0, RSTART + 1, RLENGTH - 1); return 0 }
+    /^\[JOIN [0-9]+ / { joined++; t = stamp(); if (t > lt) lt = t; next }
+    /^\[END ROUND [0-9]+ [0-9]+ / { turns++; lr = $3; ls = $4; miss[ls] = 0; t = stamp(); if (t > lt) lt = t; next }
+    /^\[SKIP [0-9]+ [0-9]+ / { turns++; lr = $2; ls = $3; miss[ls]++; t = stamp(); if (t > lt) lt = t; next }
+    /^### Round [0-9]+ seat [0-9]+/ { author = $5; next }
+    /^#### Outcome/ { outcomes++; split("", acc); next }
+    /^\[ACCEPT [0-9]+\]$/ { s = substr($2, 1, length($2) - 1); if (outcomes && s == author) acc[s] = 1; next }
+    /^(- )?C[0-9]+\.[0-9]+ \[(open|accepted|refuted|retracted)\]/ {
+      line = $0; sub(/^- /, "", line); split(line, w, " "); st[w[1]] = w[2]; next }
+    END {
+      open = 0; open_ids = ""; for (c in st) if (st[c] == "[open]") { open++; open_ids = open_ids " " c }
+      present = 0; accepts = 0; absent = ""
+      for (s = 1; s <= N; s++) {
+        if (miss[s] >= 2) { absent = absent " " s; continue }
+        present++; if (acc[s]) accepts++
+      }
+      if (turns == 0) { r = 1; s = 0 } else { r = lr; s = ls }
+      for (i = 0; i < N; i++) { s++; if (s > N) { s = 1; r++ } if (!(miss[s] >= 2)) break }
+      printf "JOINED=%d NEXT_ROUND=%d NEXT_SEAT=%d LAST_T=%d OPEN=%d OPEN_IDS=\"%s\" PRESENT=%d ACCEPTS=%d OUTCOMES=%d ABSENT=\"%s\"\n",
+        joined, r, s, lt, open, open_ids, present, accepts, outcomes, absent
+    }' "$F")"
+}
+
+harness_of() { sed -n "s/^\[JOIN $1 | harness: \([^|]*\) |.*/\1/p" "$F" | head -n 1 | sed 's/ *$//'; }
+is_absent() { case " $ABSENT " in *" $1 "*) return 0 ;; *) return 1 ;; esac; }
+need_seat() {
+  is_int "$SEAT" || die "--seat N is required"
+  [ "$SEAT" -ge 1 ] && [ "$SEAT" -le "$JOINED" ] || die "seat $SEAT has not joined"
+}
+
+cmd_init() {
+  title= topic= topic_file= n=2 rounds=10 minutes=60 turn=10 rule=unanimous root=/tmp/hashout
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --title) title=$2; shift 2 ;;
+      --topic) topic=$2; shift 2 ;;
+      --topic-file) topic_file=$2; shift 2 ;;
+      --participants) n=$2; shift 2 ;;
+      --rounds) rounds=$2; shift 2 ;;
+      --minutes) minutes=$2; shift 2 ;;
+      --turn-minutes) turn=$2; shift 2 ;;
+      --rule) rule=$2; shift 2 ;;
+      --root) root=$2; shift 2 ;;
+      *) die "unknown init option: $1" ;;
+    esac
+  done
+  [ -n "$title" ] || die "--title is required"
+  if [ -n "$topic_file" ]; then [ -f "$topic_file" ] || die "no such topic file: $topic_file"; topic=$(cat "$topic_file"); fi
+  [ -n "$topic" ] || die "--topic or --topic-file is required"
+  for v in "$n" "$rounds" "$minutes" "$turn"; do is_int "$v" || die "numbers only: $v"; done
+  [ "$n" -ge 2 ] && [ "$n" -le 5 ] || die "--participants must be 2 to 5"
+  case "$rule" in unanimous|majority) ;; *) die "--rule must be unanimous or majority" ;; esac
+  mkdir -p "$root" || die "cannot create $root"
+  slug=$(printf '%s' "$title" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-' | sed 's/^-*//; s/-*$//' | cut -c1-50 | sed 's/-*$//')
+  [ -n "$slug" ] || slug=debate
+  base="$root/$(date +%Y-%m-%d)-$slug"
+  F="$base.md"; i=2
+  while [ -e "$F" ]; do F="$base-$i.md"; i=$((i + 1)); done
+  deadline=$(( $(now) + minutes * 60 ))
+  {
+    echo "# hashout: $title"
+    echo
+    echo "participants: $n"
+    echo "rounds: $rounds"
+    echo "deadline: $deadline ($(utc "$deadline"))"
+    echo "turn-minutes: $turn"
+    echo "rule: $rule"
+    echo
+    echo "Append only through the hashout script. Read the hashout skill before taking part."
+    echo
+    echo "## Prompt"
+    echo
+    printf '%s\n' "$topic"
+    echo
+    echo "## Seats"
+    echo
+  } > "$F"
+  echo "file=$F"
+  echo "join: /hashout join $F"
+}
+
+cmd_join() {
+  harness= model=unknown
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --harness) harness=$2; shift 2 ;;
+      --model) model=$2; shift 2 ;;
+      *) die "unknown join option: $1" ;;
+    esac
+  done
+  [ -n "$harness" ] || die "--harness is required"
+  harness=$(printf '%s' "$harness" | tr -d '|[]\n'); model=$(printf '%s' "$model" | tr -d '|[]\n')
+  lock "$F"; load
+  [ "$CLOSED" = 0 ] || die "debate is closed"
+  [ "$JOINED" -lt "$N" ] || die "all $N seats are taken"
+  seat=$((JOINED + 1))
+  echo "[JOIN $seat | harness: $harness | model: $model | @$(now)]" >> "$F"
+  unlock
+  echo "seat=$seat"
+  echo "label=$seat ($harness)"
+  [ "$seat" -eq "$N" ] && echo "all seats joined; seat 1 opens round 1" || echo "waiting for $((N - seat)) more to join"
+}
+
+cmd_wait() {
+  timeout=90 interval=2
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --seat) SEAT=$2; shift 2 ;;
+      --timeout) timeout=$2; shift 2 ;;
+      --interval) interval=$2; shift 2 ;;
+      *) die "unknown wait option: $1" ;;
+    esac
+  done
+  is_int "$timeout" && is_int "$interval" || die "numbers only for --timeout and --interval"
+  start=$(now)
+  while :; do
+    load
+    if [ "$CLOSED" = 1 ]; then echo "closed: $(grep '^\[CLOSED ' "$F" | tail -n 1)"; exit 1; fi
+    need_seat
+    if is_absent "$SEAT"; then echo "you missed two turns and are marked absent"; exit 5; fi
+    t=$(now)
+    if [ "$t" -ge "$DEADLINE" ]; then echo "deadline passed: propose an Outcome in a round or run close"; exit 2; fi
+    if [ "$JOINED" -eq "$N" ]; then
+      if [ "$NEXT_ROUND" -gt "$ROUNDS" ]; then echo "round limit reached: run close"; exit 2; fi
+      if [ "$NEXT_SEAT" -eq "$SEAT" ]; then
+        echo "your turn: round $NEXT_ROUND, seat $SEAT. Read the file, then: hashout post $F --seat $SEAT"
+        [ "$OPEN" -gt 0 ] && echo "open claims:$OPEN_IDS (change one by restating its ID with a new status)"
+        exit 0
+      fi
+      if [ $((t - LAST_T)) -ge $((TURN_MIN * 60)) ]; then
+        echo "seat $NEXT_SEAT has been silent $(( (t - LAST_T) / 60 )) min: you may run hashout skip $F --seat $SEAT"
+        exit 4
+      fi
+      waiting="seat $NEXT_SEAT (round $NEXT_ROUND)"
+    else
+      waiting="$((N - JOINED)) more to join"
+    fi
+    if [ $((t - start)) -ge "$timeout" ]; then echo "still waiting for $waiting: run wait again"; exit 3; fi
+    sleep "$interval"
+  done
+}
+
+cmd_post() {
+  body_file=
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --seat) SEAT=$2; shift 2 ;;
+      --body-file) body_file=$2; shift 2 ;;
+      *) die "unknown post option: $1" ;;
+    esac
+  done
+  tmp=$(mktemp "${TMPDIR:-/tmp}/hashout.XXXXXX") || die "mktemp failed"
+  if [ -n "$body_file" ]; then cat "$body_file" > "$tmp" || die "cannot read $body_file"; else cat > "$tmp"; fi
+  [ -s "$tmp" ] || { rm -f "$tmp"; die "empty body"; }
+  if grep -Eq '^(\[(JOIN|END ROUND|SKIP|CLOSED) |### Round |## )' "$tmp"; then
+    rm -f "$tmp"; die "body may not contain marker lines ([JOIN, [END ROUND, [SKIP, [CLOSED) or ## / ### Round headings"
+  fi
+  lock "$F"; load
+  [ "$CLOSED" = 0 ] || { rm -f "$tmp"; die "debate is closed"; }
+  need_seat
+  [ "$JOINED" -eq "$N" ] || { rm -f "$tmp"; die "waiting for $((N - JOINED)) more to join"; }
+  [ "$(now)" -lt "$DEADLINE" ] || { rm -f "$tmp"; die "deadline passed: run close"; }
+  [ "$NEXT_ROUND" -le "$ROUNDS" ] || { rm -f "$tmp"; die "round limit reached: run close"; }
+  [ "$NEXT_SEAT" -eq "$SEAT" ] || { rm -f "$tmp"; die "not your turn: seat $NEXT_SEAT is next"; }
+  {
+    [ "$NEXT_ROUND" -eq 1 ] && ! grep -q '^## Rounds$' "$F" && printf '\n## Rounds\n'
+    printf '\n### Round %s seat %s (%s)\n\n' "$NEXT_ROUND" "$SEAT" "$(harness_of "$SEAT")"
+    cat "$tmp"
+    printf '\n[END ROUND %s %s @%s]\n' "$NEXT_ROUND" "$SEAT" "$(now)"
+  } >> "$F"
+  rm -f "$tmp"
+  unlock
+  echo "posted round $NEXT_ROUND seat $SEAT; next: hashout wait $F --seat $SEAT"
+}
+
+cmd_skip() {
+  while [ $# -gt 0 ]; do
+    case "$1" in --seat) SEAT=$2; shift 2 ;; *) die "unknown skip option: $1" ;; esac
+  done
+  lock "$F"; load
+  [ "$CLOSED" = 0 ] || die "debate is closed"
+  need_seat
+  [ "$JOINED" -eq "$N" ] || die "not all seats have joined"
+  [ "$NEXT_SEAT" -ne "$SEAT" ] || die "it is your turn; post instead"
+  t=$(now)
+  [ $((t - LAST_T)) -ge $((TURN_MIN * 60)) ] || die "seat $NEXT_SEAT is not past the $TURN_MIN-minute turn limit"
+  echo "[SKIP $NEXT_ROUND $NEXT_SEAT by $SEAT @$t]" >> "$F"
+  unlock
+  echo "skipped seat $NEXT_SEAT in round $NEXT_ROUND"
+}
+
+cmd_status() {
+  load
+  if [ "$CLOSED" = 1 ]; then echo "closed: $(grep '^\[CLOSED ' "$F" | tail -n 1)"; echo "file=$F"; return 0; fi
+  echo "file=$F"
+  echo "seats: $JOINED of $N joined; absent:${ABSENT:- none}"
+  grep '^\[JOIN ' "$F" | sed 's/ | @[0-9]*\]$/]/'
+  echo "next: round $NEXT_ROUND seat $NEXT_SEAT (limit $ROUNDS rounds)"
+  echo "open claims: $OPEN${OPEN_IDS:+ ($OPEN_IDS )}; outcome proposals: $OUTCOMES; accepts of latest: $ACCEPTS of $PRESENT present ($RULE)"
+  echo "minutes left: $(( (DEADLINE - $(now)) / 60 ))"
+}
+
+cmd_close() {
+  result=${1:-}; [ $# -gt 0 ] && shift
+  while [ $# -gt 0 ]; do
+    case "$1" in --seat) SEAT=$2; shift 2 ;; *) die "unknown close option: $1" ;; esac
+  done
+  case "$result" in agreed|deadlocked) ;; *) die "close needs agreed or deadlocked" ;; esac
+  lock "$F"; load
+  [ "$CLOSED" = 0 ] || die "debate is already closed"
+  need_seat
+  if [ "$result" = agreed ]; then
+    [ "$OUTCOMES" -gt 0 ] || die "no #### Outcome proposal yet"
+    [ "$OPEN" -eq 0 ] || die "claims still open:$OPEN_IDS"
+    if [ "$RULE" = unanimous ]; then
+      [ "$ACCEPTS" -eq "$PRESENT" ] || die "$ACCEPTS of $PRESENT present seats accepted the latest Outcome"
+    else
+      [ $((ACCEPTS * 2)) -gt "$PRESENT" ] || die "only $ACCEPTS of $PRESENT present seats accepted the latest Outcome"
+    fi
+  fi
+  marker="[CLOSED $result by $SEAT @$(now)]"
+  printf '\n## Result\n\n%s\n' "$marker" >> "$F"
+  unlock
+  echo "closed $result; file at $F"
+}
+
+[ $# -ge 1 ] || { usage; exit 64; }
+cmd=$1; shift
+SEAT=
+case "$cmd" in
+  -h|--help|help) usage; exit 0 ;;
+  init) cmd_init "$@" ;;
+  join|wait|post|skip|status|close)
+    [ $# -ge 1 ] || die "$cmd needs FILE"
+    F=$1; shift
+    "cmd_$cmd" "$@" ;;
+  *) usage; exit 64 ;;
+esac
