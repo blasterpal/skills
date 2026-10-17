@@ -1,7 +1,7 @@
 ---
 name: convo
 description: Save compressed current-state conversation briefs for continuation, or list, reopen, and search saved briefs and optional episodic history.
-argument-hint: "[profile] list [--episodic] [topic] | recent [--episodic] [topic] | last | open|read <ref> | save [new] [topic] | setup"
+argument-hint: "[profile] list [--episodic] [topic] | recent [--episodic] [topic] | last | open|read <ref> | save [new] [topic] | setup [--root <folder> ...]"
 allowed-tools: Bash(python3 ${CLAUDE_SKILL_DIR}/scripts/convo.py:*)
 ---
 
@@ -21,13 +21,7 @@ Conversations go in one folder. Its path persists in `${XDG_CONFIG_HOME:-~/.conf
 
 ## First use
 
-Run `root`. If it reports `SETUP_REQUIRED`, ask where the user would like to save conversations. Suggest a context directory for persistent notes, such as `~/context`, with conversations in `~/context/convos`. Explain that the chosen path is the conversation folder itself. Wait for their answer; the suggestion is not consent to create it. If the request already supplies a destination, use it. After they choose, run:
-
-```sh
-python3 <skill-directory>/scripts/convo.py setup --root '<chosen-conversation-folder>'
-```
-
-Resume the original request after setup. `setup` on a configured folder prints its settings; change a path only when requested, and note that changing it does not move existing snapshots.
+A preload that prints `SETUP_REQUIRED=` (or a `root` command that exits 3) means no folder is configured yet. Follow [references/profiles.md](references/profiles.md), which the preload includes: ask where to keep conversations, then run `setup --root '<folder>'` and resume the original request. If the request already supplies a destination, use it.
 
 ## Requests
 
@@ -39,7 +33,7 @@ Resume the original request after setup. `setup` on a configured folder prints i
 | `last` | The most recently saved or amended snapshot. |
 | `open <ref>` / `read <ref>` | A snapshot by slug, exact filename, `YYYY-MM/<file>`, or absolute path within the store. |
 | `save [new] [topic]` | Read [references/save.md](references/save.md) and save or amend the current conversation. |
-| `setup` | Show the current settings, or complete first-use setup above. |
+| `setup [...]` | Show the configuration, finish first use, or add and change folders and profiles per [references/profiles.md](references/profiles.md). |
 
 For reads, follow [references/read.md](references/read.md). `--episodic` adds historical transcripts through an available episodic-memory capability; it is optional and requires no particular plugin. Local storage works without archived history.
 
@@ -51,9 +45,9 @@ Snapshots are minimal continuation briefs: current state, decisions, constraints
 
 ## Several folders (optional)
 
-Someone who keeps separate conversation folders, such as personal and work, configures each as a profile in the same config file; the README shows the keys. `PROFILE=` in the preload names the one in use. The helper picks it in this order: `--profile <name>` on the command line, then the `CONVO_PROFILE` variable and any variables named in the config's `profile_env` list, then a profile whose `dirs` contain the working directory, then the config's `default`, then `me`. A configured profile name or alias before the verb or right after it (`/convo work recent`, `/convo save work topic`) selects that profile for the request; pass it as `--profile <name>` on every follow-up helper call and stay in that store unless the user selects another. Any other word is part of the topic.
+Someone who keeps separate conversation folders, such as personal and work, configures each as a profile with `setup --profile <name> ...`; [references/profiles.md](references/profiles.md) has the options and the selection order. `PROFILE=` in the preload names the one in use. A configured profile name or alias before the verb or right after it (`/convo work recent`, `/convo save work topic`) selects that profile for the request; pass it as `--profile <name>` on every follow-up helper call and stay in that store unless the user selects another. Any other word is part of the topic.
 
-Refs may name a profile as `<profile-or-alias>:<path>`; a ref that belongs to another profile is refused rather than read. A profile's `instructions` file (or `<root>/CONVO.md`) is appended to every preload, and its `save_hook` output joins the save metadata; apply both, as they take precedence over the reference files where they differ. `setup --profile <name> --root <folder>` adds a folder.
+Refs may name a profile as `<profile-or-alias>:<path>`; a ref that belongs to another profile is refused rather than read. A profile's instructions file is appended to every preload, and its save hook output joins the save metadata; apply both, as they take precedence over the reference files where they differ.
 
 In Claude Code, the block below runs before this skill reaches the model and is replaced by its output. If you see the block itself instead (Codex, OpenCode, or another harness), get the same output with one shell call, passing the user's request after the skill name verbatim (empty when there is none) between the heredoc lines:
 

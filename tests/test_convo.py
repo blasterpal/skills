@@ -76,6 +76,28 @@ class ConvoTests(Base):
         self.assertNotIn("CONVO.md", out)
         self.assertEqual(self.run_helper("--profile", "me", "root").stdout.strip(), str(self.store))
 
+    def test_setup_options_and_setup_preload(self):
+        out = self.run_helper("preload", "--stdin", stdin="\n").stdout
+        self.assertIn("SETUP_REQUIRED=choose a conversation folder\n", out)
+        self.assertIn("===== references/profiles.md =====", out)
+        self.setup_store()
+        work = self.base / "work/convos"
+        self.run_helper("--profile", "work", "setup", "--root", str(work), "--alias", "w",
+                        "--dir", str(work.parent), "--default", "--env", "MY_DOM")
+        config = json.loads((self.base / "config/convo/config.json").read_text())
+        self.assertEqual(config["default"], "work")
+        self.assertEqual(config["profile_env"], ["MY_DOM"])
+        self.assertEqual(config["profiles"], {"me": str(self.store),
+                                              "work": {"root": str(work), "aliases": ["w"], "dirs": [str(work.parent)]}})
+        self.assertEqual(self.run_helper("root").stdout.strip(), str(work))
+        self.assertEqual(self.run_helper("--profile", "w", "root").stdout.strip(), str(work))
+        self.assertIn("already names profile work", self.run_helper("--profile", "me", "setup", "--alias", "w", code=2).stderr)
+        self.assertIn("needs --root", self.run_helper("--profile", "other", "setup", "--alias", "o", code=2).stderr)
+        out = self.run_helper("preload", "--stdin", stdin="setup\n").stdout
+        self.assertIn("PROFILE=work\nCONFIG_FILE=", out)
+        self.assertIn('"default": "work"', out)
+        self.assertIn("===== references/profiles.md =====", out)
+
     def test_setup_persists_and_profiles_are_separate(self):
         self.setup_store()
         other = self.base / "other/convos"

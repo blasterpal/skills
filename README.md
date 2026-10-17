@@ -38,9 +38,16 @@ episodic search uses whatever transcript-search capability your agent already ha
 ### Several folders
 
 To keep conversations apart, for example personal and work, add a profile per folder.
+Ask the agent (`/convo setup`), or run the helper yourself; it writes the config:
+
+```sh
+python3 skills/convo/scripts/convo.py --profile work setup --root ~/work-notes/convos --alias w --dir ~/work-notes
+```
+
 A plain string is the folder; an object adds options. Pick one with `--profile <name>`,
 an environment variable, the working directory, or the profile's name in the request
-(`/convo work recent`):
+(`/convo work recent`). [references/profiles.md](skills/convo/references/profiles.md)
+describes each option:
 
 ```json
 {
@@ -59,15 +66,9 @@ an environment variable, the working directory, or the profile's name in the req
 }
 ```
 
-| Key | Effect |
-|---|---|
-| `default` | Profile used when nothing else selects one (`me` if absent). |
-| `profile_env` | Environment variables whose value names a profile or alias. `CONVO_PROFILE` is always checked first. |
-| `aliases` | Other names for the profile, usable in requests (`/convo w recent`) and refs (`w:convos/2026-10/<file>.md`). |
-| `dirs` | Working directories, including their subfolders, that default to this profile. |
-| `base` | Folder that `<alias>:path` and `convos/...` refs are relative to; the root's parent by default. |
-| `instructions` | Markdown appended to every preload for local conventions, such as where memos go or how to link a task tracker. `<root>/CONVO.md` is used when present. |
-| `save_hook` | Command run during a save preload with `CONVO_ROOT` and `CONVO_PROFILE` set; its output joins the save metadata. |
+`instructions` (or a `CONVO.md` in the folder) holds conventions for that folder alone,
+such as where memos go or how to link a task tracker; `save_hook` runs a command whose
+output joins the save metadata.
 
 Compression is an experiment under active testing. Snapshots retain the minimum
 current state needed to continue correctly. Memos are optional and retain only

@@ -319,16 +319,75 @@ def refresh_index(root, rows):
         print(f"INDEX_STALE=could not rebuild {index}")
 
 
+def apply_setup(config, profile, args):
+    """Write the setup options for one profile and print its settings."""
+    settings = dict(profile_settings(config, profile) or {})
+    if args.root is not None:
+        if not args.root.strip():
+            raise ConvoError("choose a non-empty conversation folder")
+        root = Path(args.root).expanduser().resolve()
+        root.mkdir(parents=True, exist_ok=True)
+        settings["root"] = str(root)
+    if "root" not in settings:
+        raise ConvoError(f"profile {profile} needs --root before other options")
+    for alias in args.alias:
+        if not re.fullmatch(NEW_SLUG, alias):
+            raise ConvoError("an alias must use lowercase letters, digits, and hyphens")
+        owner = profile_named(config, alias)
+        if owner not in (None, profile):
+            raise ConvoError(f"{alias} already names profile {owner}")
+        if alias != profile and alias not in settings.setdefault("aliases", []):
+            settings["aliases"].append(alias)
+    for folder in args.dir:
+        if folder not in settings.setdefault("dirs", []):
+            settings["dirs"].append(folder)
+    for key, value in (("base", args.base), ("instructions", args.instructions), ("save_hook", args.save_hook)):
+        if value is not None:
+            settings[key] = value
+    config["profiles"][profile] = settings["root"] if list(settings) == ["root"] else settings
+    if args.default:
+        config["default"] = profile
+    for variable in args.env:
+        if variable not in config.setdefault("profile_env", []):
+            config["profile_env"].append(variable)
+    atomic_write(config_path(), json.dumps(config, indent=2) + "\n")
+    print(f"Configured {profile}: {settings['root']}")
+    print(json.dumps(settings, indent=2))
+
+
+SETUP_WORDS = ("setup", "profile", "profiles", "config")
+
+
 def preload(config, profile, text, explicit_session):
     text = text.replace("\n", " ").strip()
     if text == "$ARGUMENTS":
         text = ""
     profile, verb, topic, episodic = parse_request(config, profile, text)
-    root = root_for(config, profile)
+    out = [f"REQUEST={text or '<none>'}", f"PROFILE={profile}"]
+
+    def reference(name):
+        file = SKILL_DIR / "references" / f"{name}.md"
+        out.append(f"\n===== references/{name}.md =====")
+        out.append(file.read_text(encoding="utf-8").rstrip("\n"))
+
+    if verb in SETUP_WORDS:
+        out.append(f"CONFIG_FILE={config_path()}")
+        out.append("CONFIG=" + json.dumps(config, ensure_ascii=False))
+        reference("profiles")
+        print("\n".join(out))
+        return
+    try:
+        root = root_for(config, profile)
+    except ConvoError as error:
+        if error.code != 3:
+            raise
+        out.append(f"SETUP_REQUIRED={str(error).split(': ', 1)[-1]}")
+        reference("profiles")
+        print("\n".join(out))
+        return
     rows = snapshots(root)
     refresh_index(root, rows)
     today = dt.date.today().isoformat()
-    out = [f"REQUEST={text or '<none>'}", f"PROFILE={profile}"]
     if episodic:
         out.append("EPISODIC_REQUESTED=1")
 
@@ -375,11 +434,6 @@ def preload(config, profile, text, explicit_session):
         if hook:
             out.append(hook.rstrip("\n"))
 
-    def reference(name):
-        file = SKILL_DIR / "references" / f"{name}.md"
-        out.append(f"\n===== references/{name}.md =====")
-        out.append(file.read_text(encoding="utf-8").rstrip("\n"))
-
     if verb == "recent":
         if topic:
             filtered("RECENT", limit=15)
@@ -421,8 +475,15 @@ def main():
     parser.add_argument("--profile", "--dom", dest="profile",
                         help="conversation folder profile; only needed with several folders configured")
     commands = parser.add_subparsers(dest="command", required=True)
-    setup = commands.add_parser("setup", help="set a profile's conversation folder, or show its settings")
+    setup = commands.add_parser("setup", help="show the selected profile's settings, or set its folder and options")
     setup.add_argument("--root", help="chosen conversation folder, not its parent context directory")
+    setup.add_argument("--alias", action="append", default=[], help="another name for the profile; repeatable")
+    setup.add_argument("--dir", action="append", default=[], help="working directory that defaults to the profile; repeatable")
+    setup.add_argument("--base", help="folder that <alias>:path refs are relative to")
+    setup.add_argument("--instructions", help="Markdown file appended to every preload")
+    setup.add_argument("--save-hook", help="command whose output joins the save metadata")
+    setup.add_argument("--default", action="store_true", help="make this the default profile")
+    setup.add_argument("--env", action="append", default=[], help="environment variable whose value selects a profile; repeatable")
     commands.add_parser("root", help="print the selected profile's conversation folder")
     for name in ("list", "recent"):
         listing = commands.add_parser(name, help="JSON rows; list covers --days, recent the newest --limit")
@@ -445,17 +506,10 @@ def main():
         raise ConvoError("profile must use lowercase letters, digits, and hyphens")
     config = load_config()
     profile = select_profile(config, args.profile)
-    if args.command == "setup" and args.root is not None:
-        if not args.root.strip():
-            raise ConvoError("choose a non-empty conversation folder")
-        root = Path(args.root).expanduser().resolve()
-        root.mkdir(parents=True, exist_ok=True)
-        if isinstance(config["profiles"].get(profile), dict):
-            config["profiles"][profile]["root"] = str(root)
-        else:
-            config["profiles"][profile] = str(root)
-        atomic_write(config_path(), json.dumps(config, indent=2) + "\n")
-        print(f"Configured {profile}: {root}")
+    if args.command == "setup" and any([args.root is not None, args.alias, args.dir, args.base is not None,
+                                        args.instructions is not None, args.save_hook is not None,
+                                        args.default, args.env]):
+        apply_setup(config, profile, args)
         return
     if args.command == "preload":
         preload(config, profile, sys.stdin.read() if args.stdin else "", args.session)
@@ -465,7 +519,8 @@ def main():
         print(root)
         return
     if args.command == "setup":
-        print(json.dumps({"profile": profile, **settings_for(config, profile), "root": str(root)}, indent=2))
+        print(json.dumps({"profile": profile, **settings_for(config, profile), "root": str(root),
+                          "config_file": str(config_path()), "profiles": sorted(config["profiles"])}, indent=2))
         return
     rows = snapshots(root)
     if args.command in ("list", "recent"):
