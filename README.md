@@ -13,7 +13,7 @@ npx skills add blasterpal/skills --skill convo --skill memorywipe --skill tldr -
 
 | Skill | What it does |
 |---|---|
-| [convo](skills/convo/SKILL.md) | Experimental: save compressed continuation briefs, optional reasoning memos, and lossless plans. Asks where to store conversations on first use and needs nothing else; optional profiles keep several folders apart and add local conventions. Python 3.9+, no additional packages. |
+| [convo](skills/convo/SKILL.md) | Experimental: save compressed continuation briefs, optional reasoning memos, and lossless plans. On first use asks where to store conversations and whether to keep personal and work apart; needs nothing else. Profiles can add local conventions per folder. Python 3.9+, no additional packages. |
 | [hashout](skills/hashout/SKILL.md) | Two to five agents in different harnesses (Claude Code, Codex, OpenCode) debate a question in turns through one shared Markdown file until they agree or deadlock, for architecture and design decisions or brainstorming. Can apply another skill (such as a grilling session) and act on the agreed decision. POSIX `sh` and core tools only. |
 | [memorywipe](skills/memorywipe/SKILL.md) | Audit and clean the memory files, instruction chains, and injected context that Claude Code, Codex, or OpenCode load at the start of every session. Finds stale, duplicate, and oversized entries; presents one batched decision set; compresses what survives. |
 | [tldr](skills/tldr/SKILL.md) | Shorten prose for a busy reader: lead with the answer, cut filler and repetition, keep every fact, caveat, and item number. Self-contained; no external style guide needed. |
@@ -21,14 +21,18 @@ npx skills add blasterpal/skills --skill convo --skill memorywipe --skill tldr -
 ## Conversation storage
 
 Invoke `/convo save` or `$convo save` to save the current conversation. On first use,
-the agent asks where to store it and suggests `~/context/convos`. The chosen folder
-contains monthly Markdown snapshots, memos, and plans. That is the whole setup; the
-path is written to `${XDG_CONFIG_HOME:-~/.config}/convo/config.json`, so updating the
-skill preserves your choice:
+the agent asks whether to keep personal and work conversations in separate folders and
+where to put them, suggesting `~/context/convos`. Each folder contains monthly Markdown
+snapshots, memos, and plans. That is the whole setup; the paths are written to
+`${XDG_CONFIG_HOME:-~/.config}/convo/config.json`, so updating the skill preserves
+your choice:
 
 ```json
 {"profiles": {"me": "/Users/you/context/convos"}}
 ```
+
+With personal and work apart, `me` is the default and a session started inside a work
+directory you named saves to `work`; `/convo work recent` picks it for one request.
 
 Use `convo recent`, `convo last`, or `convo open <slug>` through your agent to resume
 saved context. Claude Code runs the helper's `preload` before the first model turn, so

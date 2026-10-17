@@ -17,11 +17,11 @@ The bundled helper needs Python 3.9 or newer and only the standard library. Reso
 python3 <skill-directory>/scripts/convo.py root
 ```
 
-Conversations go in one folder. Its path persists in `${XDG_CONFIG_HOME:-~/.config}/convo/config.json`, outside the downloaded skill, so updating the skill keeps it. Nothing else needs configuring.
+Conversations go in one folder, or in separate personal and work folders so the two contexts never mix. The paths persist in `${XDG_CONFIG_HOME:-~/.config}/convo/config.json`, outside the downloaded skill, so updating the skill keeps them. Nothing else needs configuring.
 
 ## First use
 
-A preload that prints `SETUP_REQUIRED=` (or a `root` command that exits 3) means no folder is configured yet. Follow [references/profiles.md](references/profiles.md), which the preload includes: ask where to keep conversations, then run `setup --root '<folder>'` and resume the original request. If the request already supplies a destination, use it.
+A preload that prints `SETUP_REQUIRED=` (or a `root` command that exits 3) means no folder is configured yet. Follow [references/profiles.md](references/profiles.md), which the preload includes: ask whether to keep personal and work conversations apart and where to keep them, run `setup` for each folder, and resume the original request. If the request already supplies a destination, use it.
 
 ## Requests
 

@@ -2,17 +2,31 @@
 
 The helper's `setup` command writes `${XDG_CONFIG_HOME:-~/.config}/convo/config.json`; nobody needs to edit the JSON by hand. A preload for `setup` prints `CONFIG_FILE=` and the current `CONFIG=` JSON; a preload with `SETUP_REQUIRED=` means the selected profile has no folder yet.
 
-## One folder
+## First use
 
-Most people need one conversation folder. Ask where to keep it, suggesting a context directory for persistent notes such as `~/context` with conversations in `~/context/convos`, and say that the chosen path is the conversation folder itself. Wait for the answer; the suggestion is not consent to create it. Then run:
+Ask two things, then wait for the answers; a suggestion is not consent to create anything.
+
+1. **One folder, or personal and work kept apart?** Separate folders mean a work session never lists or saves into personal conversations and the other way round. Recommend keeping them apart when the user does paid work on this machine.
+2. **Where.** Suggest a context directory for persistent notes, such as `~/context` with conversations in `~/context/convos`, and for work `~/work-context/convos` or a folder inside the employer's synced drive. Say that each chosen path is the conversation folder itself.
+
+For one folder:
 
 ```sh
-python3 <skill-directory>/scripts/convo.py setup --root '<chosen-conversation-folder>'
+python3 <skill-directory>/scripts/convo.py setup --root '<folder>'
 ```
 
-This creates the folder and writes `{"profiles": {"me": "<folder>"}}`. Resume the original request afterwards. Changing a folder later with the same command does not move existing snapshots; say so if asked to change one.
+This creates the folder and writes `{"profiles": {"me": "<folder>"}}`.
 
-## Several folders
+For personal and work, set up two profiles named `me` and `work`. Make `me` the default and, when the user names the directories that hold work code or notes, pass each as `--dir` so a session started there uses `work` without being told:
+
+```sh
+python3 <skill-directory>/scripts/convo.py --profile me setup --root '<personal-folder>' --default
+python3 <skill-directory>/scripts/convo.py --profile work setup --root '<work-folder>' --dir '<work-repo-or-notes-dir>'
+```
+
+Tell the user how to pick one afterwards: `/convo work recent` or `/convo save me <topic>` for a single request, a `--dir` match, or `CONVO_PROFILE=work` in a shell. Resume the original request after setup. Changing a folder later with the same command does not move existing snapshots; say so if asked to change one.
+
+## Adding or changing a profile
 
 Each conversation folder is a profile. Add one with `--profile <name>` and any options, repeating `--alias`, `--dir`, and `--env` as needed:
 
