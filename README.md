@@ -13,7 +13,7 @@ npx skills add blasterpal/skills --skill convo --skill memorywipe --skill tldr -
 
 | Skill | What it does |
 |---|---|
-| [convo](skills/convo/SKILL.md) | Experimental: save compressed continuation briefs, optional reasoning memos, and lossless plans. Asks where to store conversations on first use; defaults to the `me` profile. Python 3.9+, no additional packages. |
+| [convo](skills/convo/SKILL.md) | Experimental: save compressed continuation briefs, optional reasoning memos, and lossless plans. Asks where to store conversations on first use and needs nothing else; optional profiles keep several folders apart and add local conventions. Python 3.9+, no additional packages. |
 | [hashout](skills/hashout/SKILL.md) | Two to five agents in different harnesses (Claude Code, Codex, OpenCode) debate a question in turns through one shared Markdown file until they agree or deadlock, for architecture and design decisions or brainstorming. Can apply another skill (such as a grilling session) and act on the agreed decision. POSIX `sh` and core tools only. |
 | [memorywipe](skills/memorywipe/SKILL.md) | Audit and clean the memory files, instruction chains, and injected context that Claude Code, Codex, or OpenCode load at the start of every session. Finds stale, duplicate, and oversized entries; presents one batched decision set; compresses what survives. |
 | [tldr](skills/tldr/SKILL.md) | Shorten prose for a busy reader: lead with the answer, cut filler and repetition, keep every fact, caveat, and item number. Self-contained; no external style guide needed. |
@@ -22,13 +22,52 @@ npx skills add blasterpal/skills --skill convo --skill memorywipe --skill tldr -
 
 Invoke `/convo save` or `$convo save` to save the current conversation. On first use,
 the agent asks where to store it and suggests `~/context/convos`. The chosen folder
-contains monthly Markdown snapshots, memos, and plans. Configuration lives in
-`${XDG_CONFIG_HOME:-~/.config}/convo/config.json`, so updating the skill preserves
-your choice. `me` is the default profile; additional profiles can use separate folders.
+contains monthly Markdown snapshots, memos, and plans. That is the whole setup; the
+path is written to `${XDG_CONFIG_HOME:-~/.config}/convo/config.json`, so updating the
+skill preserves your choice:
+
+```json
+{"profiles": {"me": "/Users/you/context/convos"}}
+```
 
 Use `convo recent`, `convo last`, or `convo open <slug>` through your agent to resume
-saved context. Optional episodic search uses whatever transcript-search capability
-your agent already has.
+saved context. Claude Code runs the helper's `preload` before the first model turn, so
+a read takes no tool call; other harnesses run the same command first. Optional
+episodic search uses whatever transcript-search capability your agent already has.
+
+### Several folders
+
+To keep conversations apart, for example personal and work, add a profile per folder.
+A plain string is the folder; an object adds options. Pick one with `--profile <name>`,
+an environment variable, the working directory, or the profile's name in the request
+(`/convo work recent`):
+
+```json
+{
+  "default": "me",
+  "profile_env": ["HQ_DOM"],
+  "profiles": {
+    "me": "~/context/convos",
+    "work": {
+      "root": "~/work-notes/convos",
+      "aliases": ["w"],
+      "dirs": ["~/work-notes", "~/code/work-repo"],
+      "instructions": "~/work-notes/convos/CONVO.md",
+      "save_hook": "~/bin/convo-work-hook"
+    }
+  }
+}
+```
+
+| Key | Effect |
+|---|---|
+| `default` | Profile used when nothing else selects one (`me` if absent). |
+| `profile_env` | Environment variables whose value names a profile or alias. `CONVO_PROFILE` is always checked first. |
+| `aliases` | Other names for the profile, usable in requests (`/convo w recent`) and refs (`w:convos/2026-10/<file>.md`). |
+| `dirs` | Working directories, including their subfolders, that default to this profile. |
+| `base` | Folder that `<alias>:path` and `convos/...` refs are relative to; the root's parent by default. |
+| `instructions` | Markdown appended to every preload for local conventions, such as where memos go or how to link a task tracker. `<root>/CONVO.md` is used when present. |
+| `save_hook` | Command run during a save preload with `CONVO_ROOT` and `CONVO_PROFILE` set; its output joins the save metadata. |
 
 Compression is an experiment under active testing. Snapshots retain the minimum
 current state needed to continue correctly. Memos are optional and retain only

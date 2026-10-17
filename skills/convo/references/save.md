@@ -2,7 +2,7 @@
 
 ## Choose the target
 
-Use the supplied topic or infer a short title from the current conversation. Choose a distinctive lowercase kebab-case slug. Run `prepare-save <slug>` once; retain its creation instant, local date, store root, session reference, and candidate snapshots across tool calls.
+Use the supplied topic or infer a short title from the current conversation. Choose a distinctive lowercase kebab-case slug. A preload already supplies `CREATED_AT`, `SESSION_REF`, `CONVO_ROOT`, `TODAY`, today's snapshots as `TODAY_CONVO=slug|path|title|project` rows, and any `save_hook` output; otherwise run `prepare-save <slug>` once. Retain the creation instant, local date, store root, session reference, and candidate snapshots across tool calls. Apply any profile instructions appended to the preload; they take precedence over this file where they differ.
 
 Amend the snapshot already saved for this subject in this session, or a clear matching snapshot from today. Read it and any linked memo before writing. If several candidates fit, ask which to amend. An older exact slug match may be amended for a continuation; choose a different slug for a distinct subject. `save new` always creates a new snapshot with a unique slug. A save captures the current conversation; reading another profile's material does not authorize copying it into this one.
 
