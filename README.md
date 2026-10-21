@@ -17,6 +17,7 @@ npx skills add blasterpal/skills --skill convo --skill memorywipe --skill tldr -
 | [convo](skills/convo/SKILL.md) | Experimental: save compressed continuation briefs, optional reasoning memos, and lossless plans. On first use asks where to store conversations and whether to keep personal and work apart; needs nothing else. Profiles can add local conventions per folder. Python 3.9+, no additional packages. |
 | [hashout](skills/hashout/SKILL.md) | Two to five agents in different harnesses (Claude Code, Codex, OpenCode) debate a question in turns through one shared Markdown file until they agree or deadlock, for architecture and design decisions or brainstorming. Can apply another skill (such as a grilling session) and act on the agreed decision. POSIX `sh` and core tools only. |
 | [memorywipe](skills/memorywipe/SKILL.md) | Audit and clean the memory files, instruction chains, and injected context that Claude Code, Codex, or OpenCode load at the start of every session. Finds stale, duplicate, and oversized entries; presents one batched decision set; compresses what survives. |
+| [mission](skills/mission/SKILL.md) | Explicit `/mission` command to pursue a plan or objective with verified progress and optional unattended AFK mode. OpenCode idle continuation requires a separate mission plugin. |
 | [tldr](skills/tldr/SKILL.md) | Shorten prose for a busy reader: lead with the answer, cut filler and repetition, keep every fact, caveat, and item number. Self-contained; no external style guide needed. |
 
 ## Conversation storage
