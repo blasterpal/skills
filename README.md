@@ -9,6 +9,34 @@ npx skills add blasterpal/skills --list
 npx skills add blasterpal/skills --skill convo --skill memorywipe --skill tldr -a claude-code
 ```
 
+## Updating installed skills
+
+Check for updates, then update skills installed with `npx skills add`:
+
+```sh
+npx skills check
+npx skills update
+```
+
+`update` prompts for project or global scope. To choose explicitly or update only
+one skill:
+
+```sh
+npx skills update -g                # All globally installed skills
+npx skills update -p                # All skills in the current project
+npx skills update mission -g        # Only the globally installed mission skill
+```
+
+Updates refresh installed skills; they do not install newly added skills from this
+repository. Add a new skill separately (omit `-g` for a project install):
+
+```sh
+npx skills add blasterpal/skills --skill mission -g -a claude-code
+```
+
+For development links created by `scripts/link-skills.sh`, pull the latest changes
+in your clone instead; the links already point to its files.
+
 ## Skills
 
 | Skill | What it does |
