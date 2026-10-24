@@ -1,0 +1,21 @@
+# Independent AFK decision review
+
+Use the named `mission-judge` OpenCode subagent with an explicit per-call model different from the proposer; prefer a different model family. Resolve it within the active environment using [MODEL_ROUTING.md](MODEL_ROUTING.md). A profile is an optional default, not a prerequisite. Record requested route and actual reported model separately. Configured provider/model IDs establish the requested route, not proof of the upstream deployment. If the judge is unavailable or uses the same actual model, record the limitation; never claim independent convergence.
+
+The judge has read-only tools, no worker delegation, and no authority over the ledger, tracker, or integration branch. The orchestrator persists its reports and verifies its factual claims. Permission settings reduce tool access; they are not an OS sandbox.
+
+## When to judge
+
+Judge a provisional decision that changes architecture, observable behavior, acceptance criteria, dependencies, or the plan for multiple workers. Reuse an accepted decision while its evidence and assumptions remain current. Routine edits following that decision need tests, not another model vote. Judge independent decisions in parallel only when they do not depend on each other.
+
+A budget profile is appropriate for reversible code-only work and its planning. Use the stronger profile, or record `Needs user:`, for security/privacy boundaries, data loss, external commitments, money, or uncertain requirements with a substantial cost of being wrong. Profile escalation is bounded by the user's model/provider and spending authorization; never silently move to a premium route. Every routing choice preserves the mission's existing permissions and active environment.
+
+## Review and converge
+
+1. Before showing the proposed answer, give the judge a small decision packet: the question, owner's objective and confirmed constraints, cited evidence, plausible alternatives, acceptance checks, and what would make a choice wrong. Exclude the proposer's preferred answer and confidence. Ask the judge for its independent recommendation, missing evidence, and material risks. Store the task/session ID so the same judge can continue the exchange.
+2. Compare the independent answer with the proposal. Supply the exact proposed decision and rationale, the judge's objections, and any new evidence. Ask for one verdict: `accept`, `revise`, `needs_evidence`, or `needs_human`, with claim-specific reasons and citations. A preference difference alone is not a factual defect; the judge must identify its practical consequence.
+3. Revise against supported objections and run any proposed checks. Repeat the critique/revision exchange for at most three rounds after the independent assessment. Keep the decision, evidence, and verdict for each round. Convergence requires explicit judge acceptance of the current revision, no unresolved material objections, and the applicable checks passing. Agreement without evidence is not validation.
+4. Record `Ruling: provisional, judge-converged — <decision> — <why> — <cost if wrong>` only after those conditions hold. Include alternatives, conditions that would change the answer, proposer/judge routes, evidence, and check results. Cite it from the task's tick. Retain `Needs user:` for any authority the objective did not delegate; convergence cannot approve publishing, spending, protected-branch merging, or a HITL ticket.
+5. If evidence is missing, schedule bounded fact finding and keep dependent tasks waiting. At the round limit or an unresolved material disagreement, record `not converged` with both positions and a concrete next check or `Needs user:`. Continue independent work. Judge failure, timeout, or malformed output is not acceptance; retry once, then leave the decision unvalidated. A failed judge run uses one of the existing retries, not an unbounded new budget.
+
+The final report distinguishes owner-confirmed decisions, judge-converged provisional decisions, and unresolved decisions. Implementation may rely on a provisional choice only when the objective explicitly permits it; passing tests or two agreeing models do not change its approval status.

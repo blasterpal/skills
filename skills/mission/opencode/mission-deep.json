@@ -1,0 +1,26 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "default_agent": "mission",
+  "model": "litellm/claude-opus-5-5",
+  "subagent_depth": 1,
+  "agent": {
+    "mission": {
+      "model": "litellm/claude-opus-5-5"
+    },
+    "mission-research": {
+      "model": "litellm/gpt-6.1-sol"
+    },
+    "mission-implement": {
+      "model": "litellm/claude-sonnet-5-5"
+    },
+    "mission-judge": {
+      "model": "litellm/gpt-6-astra"
+    },
+    "mission-review": {
+      "model": "litellm/gpt-6-astra"
+    },
+    "mission-merger": {
+      "model": "litellm/gpt-6-luna"
+    }
+  }
+}

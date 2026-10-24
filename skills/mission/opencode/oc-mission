@@ -1,0 +1,30 @@
+#!/bin/sh
+set -eu
+mission_profile=budget
+case "${1-}" in
+  --profile)
+    [ "$#" -ge 2 ] || { echo 'Usage: oc-mission [--profile budget|deep] [opencode arguments...]' >&2; exit 2; }
+    mission_profile=$2
+    shift 2
+    ;;
+  --profile=*)
+    mission_profile=${1#--profile=}
+    shift
+    ;;
+  --help|-h)
+    echo 'Usage: oc-mission [--profile budget|deep] [opencode arguments...]'
+    echo 'Run from the project directory; invoke /mission in the OpenCode session.'
+    exit 0
+    ;;
+esac
+case "$mission_profile" in
+  budget|deep) ;;
+  *) echo "Unknown mission profile: $mission_profile (use budget or deep)" >&2; exit 2 ;;
+esac
+mission_config="$HOME/.config/opencode/profiles/mission-$mission_profile.json"
+[ -f "$mission_config" ] || { echo "Mission profile is missing: $mission_config" >&2; exit 1; }
+export OPENCODE_CONFIG="$mission_config"
+if [ -x "$HOME/.local/bin/oc" ]; then
+  exec "$HOME/.local/bin/oc" "$@"
+fi
+exec opencode "$@"

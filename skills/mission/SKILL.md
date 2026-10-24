@@ -1,33 +1,56 @@
 ---
 name: mission
-description: Explicit /mission command only. Pursue the supplied plan or objective across idle turns, with optional unattended AFK mode.
+description: Explicit /mission command only. Orchestrate a plan or objective with workflow skills, parallel workers, and judged AFK decisions.
 disable-model-invocation: true
 ---
 
 # /mission
 
-The **ledger** is the plan file and the record of task progress. A **tick** is `- [x] <task> — evidence: <check or source> → <observed result>`; a tick without evidence counts as unticked. A **brief** is a self-contained assignment using [BRIEF.md](BRIEF.md). **BLOCKED** is `BLOCKED: <task> — <what the user must provide>` and stops the whole mission early.
+Mission is the orchestrator. It chooses ready work, delegates bounded tasks, verifies results, and records progress. Workers perform assigned work; they do not start mission loops.
 
-Run this skill only when the user explicitly invokes `/mission` (or the equivalent skill command in Claude Code or Codex). OpenCode ignores `disable-model-invocation`; its `/mission` command loads this file directly, so the description also says explicit invocation only. OpenCode's mission plugin reads `.loop` and resumes on idle. Claude Code and Codex do not use that plugin: follow the same ledger and verification rules, continue through the plan in the active turn, and stop only on completion or a genuine block. Keep the ledger in an allowed workspace path and follow local restrictions on Git and worktrees. Use a worker only when this runtime offers one and separate context materially helps.
+The **ledger** records the objective and progress. A **tick** is `- [x] <task> — evidence: <check or source> → <observed result>`; without evidence it remains unticked. A **brief** follows [BRIEF.md](BRIEF.md). `Needs user: <decision or approval>` records a pending human action. `BLOCKED: <task> — <what the user must provide>` ends the mission only when no meaningful authorized work can advance. Omit `BLOCKED:` entirely when there is no blocker; do not write a placeholder such as `BLOCKED: none`.
 
-## Mode
+Run only on an explicit `/mission` invocation. For engineering work, read [MATT.md](MATT.md) to use Matt's skills. This invocation delegates their methods within the mission's objective; it does not authorize additional publishing or implementation.
 
-`/mission [plan path]` runs the plan below. `/mission --afk [objective or plan path]` runs unattended: read [AFK.md](AFK.md) and follow its Start, Round, and Exit instead. With no argument after `--afk`, take the objective from this session's current work. The AFK mode makes provisional decisions on ambiguity and records them for the user's review.
+## Help
+
+If the arguments are exactly `help`, `--help`, or `-h`, read [HELP.md](HELP.md) and explain usage. This is a read-only help request: do not create or modify a ledger, `.loop`, branches, worker assignments, or project files, and do not resume an existing mission. Return after showing help. With no objective or recoverable current work, explain the syntax and ask what result the user wants.
+
+## Mode and runtime
+
+`/mission [plan path or objective]` follows Start and Round below. `/mission --afk [objective or plan path]` follows [AFK.md](AFK.md) instead. With no AFK argument, recover the objective from this session. AFK makes provisional judgments and uses the independent judge described in [JUDGE.md](JUDGE.md).
+
+In OpenCode, use the `mission` primary agent inside `oc-me` or `oc-work`. Read [MODEL_ROUTING.md](MODEL_ROUTING.md) to select a permitted model per assignment; profiles are optional defaults. Read [OPENCODE.md](OPENCODE.md) for launch and continuation details. The plugin reads `.loop` and resumes the same root session on idle. Claude Code and Codex have no such plugin: continue in the active turn until completion or a genuine block. Use an allowed workspace path and follow local restrictions on Git and worktrees, including any restrictions for synced folders. If worker tools are unavailable, do the work directly and report that limitation.
+
+## Input and conclusion
+
+Accept a prompt, idea, concept, feature brief, or existing plan. Preserve supplied source files; a brief is input, not a ledger to overwrite. Extract the desired outcome, required user features, constraints, non-goals, and acceptance examples. Record their sources and distinguish explicit requirements from inferred defaults. Reuse existing work only after checking it against these inputs.
+
+For a request to take a software idea through implementation, the conclusion is a tested local implementation on an integration branch, with review findings addressed and a reviewable handoff. A request limited to planning, a spec, or tickets stops at that artifact. Publishing and merging the protected target branch remain separate permissions. For other kinds of work, define the concrete requested deliverable rather than forcing a code workflow.
 
 ## Start
 
-1. Use the ledger path in the arguments. Otherwise use the plan written in this session. If neither exists, write a short ledger from the stated objective and done criteria. Resolve the path to an absolute path. Continue when the ledger exists.
-2. Make each task one `- [ ]` line with a checkable done condition, including a command that can be run locally. Preserve the plan's requirements and dependencies. Continue when every task has a done condition.
-3. In OpenCode only, at the working root write `.loop` as JSON: `{"ledger":"<absolute path>","max_rounds":20}`. The ledger remains the state record; `.loop` only enables plugin continuation. In other harnesses, proceed directly to Round.
+1. Read the supplied ledger, or create one from the objective. Record an absolute ledger path, source pointers, the required user features, the requested result, **Done when**, confirmed constraints, non-goals, existing authorization, and the active environment, optional profile, and model choices. A planning request ends in planning; a build request may include implementation. Keep external actions and merging the target branch separate from local integration.
+2. Make tasks `- [ ]` lines with dependencies and checkable outcomes. Use commands for executable behavior and cited inspection criteria for design or research. Add a final audit against **Done when** and every required user feature. Keep feature-to-spec/ticket/check pointers in the result so a feature cannot disappear during decomposition. For tracker-backed work, link the canonical issues rather than copying their requirements into the ledger.
+3. In OpenCode only, write `.loop` at the working root as `{"ledger":"<absolute path>","max_rounds":20}`. Use a session ID only if the harness already provides it; otherwise omit it and let the plugin bind on idle. Do not inspect runtime source or session databases to discover an optional ID. Never overwrite another session's binding. The plugin binds the selected model and variant on first continuation. Preserve that binding on resume. Other harnesses proceed directly to Round.
+
+## Delegation
+
+1. Dispatch ready independent tasks concurrently, bounded by runtime capacity and the selected profile. Before dispatch, record the task, worker, owned files or worktree, dependencies, and starting commit in the ledger. Reconcile existing assignments on resume before launching replacements. Claim tracker tickets using the repository's convention; the ledger distinguishes workers sharing one login.
+2. Give each worker a [brief](BRIEF.md) with exact skill and source pointers. Use the task plugin’s explicit model and reasoning arguments as described in [MODEL_ROUTING.md](MODEL_ROUTING.md); inspect the child result and model record rather than trusting the completed envelope alone. Research workers return evidence; the orchestrator writes shared notes. Each implementer owns a separate branch/worktree based on the integration branch, with isolated databases and ports where required. Shared ledger, glossary, ADR, spec, and map updates have one writer.
+3. Run one implementation scheduler: the mission orchestrator follows `implement-spec` itself and dispatches its workers. A worker does not launch another scheduler or create `.loop`. One merger updates the integration branch at a time; parallel implementation does not authorize merging the protected target branch.
+4. The merger prepares each integration on a separate candidate branch/worktree based on the last verified integration commit. The orchestrator verifies that candidate before advancing the integration branch to the identical checked commit. Failed candidates stay isolated for repair; other ready work keeps the last verified base. A worker's report alone cannot tick a task or release its dependents. Finish or safely stop active workers before yielding an OpenCode round. Read-only review tasks may run concurrently on the same pinned commit.
 
 ## Round
 
-1. Read the ledger. Pick the first unticked task whose dependencies are met. Read the relevant repository rules. Continue when one task and its done condition are identified.
-2. When a separate worker is useful and available, dispatch one with [BRIEF.md](BRIEF.md) and give it only the files it may edit. Otherwise do the task directly. Continue when the changed files and unresolved items are known.
-3. Run the done-condition command yourself and inspect the changed files against the task and repository rules. Treat a worker's report as input. On failure, retry the work at most twice with the actual failure. Continue when the done condition passes and the work meets the task, or the retry limit is reached.
-4. On success, replace the task line with a tick containing the exact command and observed result. Resolve ordinary ambiguity yourself and add `Ruling: <decision> — <why> — <cost if wrong>` to the ledger. For irreversible or destructive actions, secrets, pushes, merges, publishes, or a plan where every path is a guess, write a BLOCKED line naming the needed input or approval. Write BLOCKED after two failed re-briefs as well. Continue when the ledger records the verified tick or BLOCKED line.
-5. Print one line: `mission: <ticked>/<total> ticked; next <task>` or `mission: BLOCKED <task>`. In OpenCode, end this assistant turn after one task so the plugin can continue on idle. In other harnesses, continue to the next task in this turn.
+1. Read the ledger and current deliverables. Select ready work; resolve or skip pending human actions while independent authorized work remains. Advance from decisions to spec, tickets, implementation, and verification when their prerequisites hold and the requested endpoint includes them. Add newly exposed work before the final audit; completing the initial task list is not enough if the requested outcome is still missing. Load the applicable workflow skill before assigning the task.
+2. Dispatch the ready tasks using Delegation, or do the task directly. Keep decisions shared by multiple tasks as prerequisites rather than letting workers choose inconsistent answers.
+3. Inspect the changes and run the done conditions yourself, after serialized integration when applicable. Retry failed work at most twice with the actual failure, recording attempts in the ledger so a restart does not reset the allowance. Ordinary local integration is part of an authorized build; pushes, publication, protected-branch merges, secrets, and destructive actions need the user's existing authorization.
+4. Tick verified tasks with the checked commit, exact command or source, and observed result. Record `Ruling: <decision> — <why> — <cost if wrong>` for ordinary ambiguity. Record pending authority as `Needs user:`. Exhausted retries or required input block their task; write `BLOCKED:` only when nothing else can advance. Inspect active work before reporting a block; do not discard verified results from other workers.
+5. Print `mission: <ticked>/<total> ticked; next <task>` or `mission: BLOCKED <task>`. In OpenCode, finish the current verified batch and yield for idle continuation; one round may complete several independent tasks. In other harnesses continue with the next ready work.
 
 ## Exit
 
-When every task has a tick with evidence, or a BLOCKED line exists, remove `.loop` if this run created it, notify the user when notification is available, and report the ticked count, every BLOCKED line, and every Ruling. In OpenCode, an unfinished round yields to plugin continuation; in other harnesses, continue working.
+Complete only when every task, including the final audit, has evidenced ticks and **Done when** holds. Distinguish draft, locally implemented, integrated/verified, published, and merged results. For a build, every required user feature needs implementation and observed acceptance evidence, or the mission remains incomplete with the specific blocker. A deferred approval, passing unit tests alone, or a completed planning artifact is not an implemented feature.
+
+On completion or a genuine block, remove only the `.loop` this run owns, notify the user when available, and report the outputs, ticked count, Rulings, judge outcomes, and remaining `Needs user:` or `BLOCKED:` lines. A plugin round-cap or no-progress stop preserves the ledger and partial result for resumption.
