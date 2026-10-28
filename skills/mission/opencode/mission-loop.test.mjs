@@ -341,3 +341,23 @@ test('a later mission command clears the help-only idle suppression', async (t) 
   await f.emit();
   assert.equal(f.calls.prompts.length, 1);
 });
+
+test('mission setup points the command at SETUP.md and leaves an active loop untouched', async (t) => {
+  const f = await fixture(t, { loop: { session: 'root' } });
+  const before = await readFile(f.loopFile, 'utf8');
+  const output = { parts: [] };
+  await f.plugin['command.execute.before']({ command: 'mission', sessionID: 'root', arguments: 'setup' }, output);
+  assert.ok(output.parts.some((part) => part.text.includes('SETUP.md')));
+  await f.emit();
+  assert.equal(await readFile(f.loopFile, 'utf8'), before);
+  assert.equal(f.calls.prompts.length, 0);
+  assert.equal(f.calls.notifications.length, 0);
+});
+
+test('a later mission command clears the setup idle suppression', async (t) => {
+  const f = await fixture(t, { loop: { session: 'root' } });
+  await f.plugin['command.execute.before']({ command: 'mission', sessionID: 'root', arguments: 'setup' }, { parts: [] });
+  await f.plugin['command.execute.before']({ command: 'mission', sessionID: 'root', arguments: '/tmp/ledger.md' }, { parts: [] });
+  await f.emit();
+  assert.equal(f.calls.prompts.length, 1);
+});

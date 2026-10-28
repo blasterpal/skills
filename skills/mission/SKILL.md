@@ -1,6 +1,6 @@
 ---
 name: mission
-description: Explicit /mission command only. Orchestrate a plan or objective with workflow skills, parallel workers, and judged AFK decisions.
+description: Explicit /mission command only. Orchestrate a plan or objective with workflow skills, parallel workers, and judged AFK decisions; /mission setup installs the OpenCode runtime.
 disable-model-invocation: true
 ---
 
@@ -10,17 +10,21 @@ Mission is the orchestrator. It chooses ready work, delegates bounded tasks, ver
 
 The **ledger** records the objective and progress. A **tick** is `- [x] <task> — evidence: <check or source> → <observed result>`; without evidence it remains unticked. A **brief** follows [BRIEF.md](BRIEF.md). `Needs user: <decision or approval>` records a pending human action. `BLOCKED: <task> — <what the user must provide>` ends the mission only when no meaningful authorized work can advance. Omit `BLOCKED:` entirely when there is no blocker; do not write a placeholder such as `BLOCKED: none`.
 
-Run only on an explicit `/mission` invocation. For engineering work, read [MATT.md](MATT.md) to use Matt's skills. This invocation delegates their methods within the mission's objective; it does not authorize additional publishing or implementation.
+Run only on an explicit `/mission` invocation; an explicit user request to set up mission is the equivalent and follows [SETUP.md](SETUP.md). For engineering work, read [MATT.md](MATT.md) to use Matt's skills. This invocation delegates their methods within the mission's objective; it does not authorize additional publishing or implementation.
 
 ## Help
 
 If the arguments are exactly `help`, `--help`, or `-h`, read [HELP.md](HELP.md) and explain usage. This is a read-only help request: do not create or modify a ledger, `.loop`, branches, worker assignments, or project files, and do not resume an existing mission. Return after showing help. With no objective or recoverable current work, explain the syntax and ask what result the user wants.
 
+## Setup
+
+If the arguments are exactly `setup`, read [SETUP.md](SETUP.md) and follow it: install the OpenCode agents, plugins, and a model profile from [MODEL_DEFAULTS.md](MODEL_DEFAULTS.md) with the user's choices. Setup is not mission work: do not create or modify a ledger, `.loop`, branches, or worker assignments, and do not resume an existing mission; change only the files SETUP.md names. In a harness without the OpenCode runtime there is nothing to set up; say so and point at the installation docs instead.
+
 ## Mode and runtime
 
 `/mission [plan path or objective]` follows Start and Round below. `/mission --afk [objective or plan path]` follows [AFK.md](AFK.md) instead. With no AFK argument, recover the objective from this session. AFK makes provisional judgments and uses the independent judge described in [JUDGE.md](JUDGE.md).
 
-In OpenCode, use the `mission` primary agent inside `oc-me` or `oc-work`. Read [MODEL_ROUTING.md](MODEL_ROUTING.md) to select a permitted model per assignment; profiles are optional defaults. Read [OPENCODE.md](OPENCODE.md) for launch and continuation details. The plugin reads `.loop` and resumes the same root session on idle. Claude Code and Codex have no such plugin: continue in the active turn until completion or a genuine block. Use an allowed workspace path and follow local restrictions on Git and worktrees, including any restrictions for synced folders. If worker tools are unavailable, do the work directly and report that limitation.
+In OpenCode, use the `mission` primary agent in the environment you started; [SETUP.md](SETUP.md) installs it when missing. Read [MODEL_ROUTING.md](MODEL_ROUTING.md) to select a permitted model per assignment; profiles are optional defaults. Read [OPENCODE.md](OPENCODE.md) for launch and continuation details. The plugin reads `.loop` and resumes the same root session on idle. Claude Code and Codex have no such plugin: continue in the active turn until completion or a genuine block. Use an allowed workspace path and follow local restrictions on Git and worktrees, including any restrictions for synced folders. If worker tools are unavailable, do the work directly and report that limitation.
 
 ## Input and conclusion
 
