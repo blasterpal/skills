@@ -1,0 +1,26 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "default_agent": "mission",
+  "model": "openrouter/z-ai/glm-5.3",
+  "subagent_depth": 1,
+  "agent": {
+    "mission": {
+      "model": "openrouter/z-ai/glm-5.3"
+    },
+    "mission-research": {
+      "model": "openrouter/deepseek/deepseek-v4.1-flash"
+    },
+    "mission-implement": {
+      "model": "openrouter/deepseek/deepseek-v4.1-flash"
+    },
+    "mission-judge": {
+      "model": "openrouter/qwen/qwen3.5-397b-a17b"
+    },
+    "mission-review": {
+      "model": "openrouter/qwen/qwen3.6-35b-a3b"
+    },
+    "mission-merger": {
+      "model": "openrouter/deepseek/deepseek-v4-pro"
+    }
+  }
+}

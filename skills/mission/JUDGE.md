@@ -8,7 +8,7 @@ The judge has read-only tools, no worker delegation, and no authority over the l
 
 Judge a provisional decision that changes architecture, observable behavior, acceptance criteria, dependencies, or the plan for multiple workers. Reuse an accepted decision while its evidence and assumptions remain current. Routine edits following that decision need tests, not another model vote. Judge independent decisions in parallel only when they do not depend on each other.
 
-A budget profile is appropriate for reversible code-only work and its planning. Use the stronger profile, or record `Needs user:`, for security/privacy boundaries, data loss, external commitments, money, or uncertain requirements with a substantial cost of being wrong. Profile escalation is bounded by the user's model/provider and spending authorization; never silently move to a premium route. Every routing choice preserves the mission's existing permissions and active environment.
+The default open-weight routes in [MODEL_DEFAULTS.md](MODEL_DEFAULTS.md) are appropriate for reversible code-only work and its planning. Use stronger permitted routes, or record `Needs user:`, for security/privacy boundaries, data loss, external commitments, money, or uncertain requirements with a substantial cost of being wrong. Escalation is bounded by the user's model/provider and spending authorization; never silently move to a premium route. Every routing choice preserves the mission's existing permissions and active environment.
 
 ## Review and converge
 

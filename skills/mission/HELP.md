@@ -6,13 +6,14 @@ Mission takes an idea, feature brief, or plan toward a defined result. One orche
 
 ```text
 /mission help
+/mission setup
 /mission Build a local CSV viewer with filtering and no external services
 /mission /absolute/path/to/ledger.md
 /mission --afk Build the features in /absolute/path/to/brief.md
 /mission --afk --max-rounds 12 /absolute/path/to/ledger.md
 ```
 
-In Codex use `$mission` instead of `/mission`. Other harnesses may expose it through their own skill command. Help aliases are `help`, `--help`, and `-h`; they show usage without starting or resuming work.
+In Codex use `$mission` instead of `/mission`. Other harnesses may expose it through their own skill command. Help aliases are `help`, `--help`, and `-h`; they show usage without starting or resuming work. `/mission setup` installs the OpenCode runtime — agents, plugins, and a model profile from [MODEL_DEFAULTS.md](MODEL_DEFAULTS.md) — following [SETUP.md](SETUP.md); it is setup, not mission work.
 
 Give mission the user features, constraints, acceptance examples, and desired conclusion. For example:
 
@@ -43,7 +44,7 @@ Use <provider/model-X> for implementation and <provider/model-Y> for judging.
 Run independent tickets in parallel.
 ```
 
-Use actual IDs from `opencode models`. Mission stays within the active environment’s configured providers and credentials. Profiles are optional bundles of defaults, not a requirement. An independent judge needs a different model, preferably a different family. Mission retains the current model for ordinary work unless the task, user preference, or applicable defaults call for another permitted route.
+Use actual IDs from `opencode models`. The default routes per role are listed in [MODEL_DEFAULTS.md](MODEL_DEFAULTS.md). Mission stays within the active environment’s configured providers and credentials. Profiles are optional bundles of defaults, not a requirement. An independent judge needs a different model, preferably a different family. Mission retains the current model for ordinary work unless the task, user preference, or applicable defaults call for another permitted route.
 
 Workers own separate files or worktrees. Candidate integrations are verified before the integration branch advances. In published `opencode-task-model@1.3.1`, background tasks are read-only; concurrent foreground tasks support editing under their agent permissions.
 
@@ -59,6 +60,6 @@ Workers own separate files or worktrees. Candidate integrations are verified bef
 
 Matt’s workflow skills must be available for the phases the objective needs: wayfinder/grilling and domain modeling, to-spec, to-tickets, research/prototype, implementation/TDD, and code review. Mission reads the applicable skill before using its method and reports missing dependencies.
 
-OpenCode additionally needs the bundled mission agent and continuation plugin; per-call model selection uses the separate task-model plugin. See [OPENCODE.md](OPENCODE.md) for runtime setup and [MODEL_ROUTING.md](MODEL_ROUTING.md) for routing details.
+OpenCode additionally needs the bundled mission agent and continuation plugin; per-call model selection uses the separate task-model plugin. Run `/mission setup` once per environment to install them with a model profile from [MODEL_DEFAULTS.md](MODEL_DEFAULTS.md); see [OPENCODE.md](OPENCODE.md) for details and [MODEL_ROUTING.md](MODEL_ROUTING.md) for routing rules.
 
 The final handoff identifies outputs, tested code or draft status, evidence, provisional decisions, judge results, and remaining user actions. A passing draft or model agreement does not establish a completed product.

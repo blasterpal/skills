@@ -10,7 +10,7 @@ Several folders are profiles. A profile value is the folder, or a dict with "roo
 
     {
       "default": "me",
-      "profile_env": ["HQ_DOM"],
+      "profile_env": ["MY_DOMAIN"],
       "profiles": {
         "me":   "~/context/convos",
         "work": {"root": "~/work/convos", "aliases": ["w"], "dirs": ["~/work"],

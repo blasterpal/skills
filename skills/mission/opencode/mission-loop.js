@@ -6,7 +6,9 @@ import { fileURLToPath } from "node:url";
 const skill = fileURLToPath(new URL("../SKILL.md", import.meta.url));
 const afkSkill = path.join(path.dirname(skill), "AFK.md");
 const helpFile = path.join(path.dirname(skill), "HELP.md");
+const setupFile = path.join(path.dirname(skill), "SETUP.md");
 const helpSessions = new Set();
+const setupSessions = new Set();
 const inFlight = new Set();
 const unownedWarnings = new Set();
 function loopConfig(raw, directory) {
@@ -59,7 +61,7 @@ function notify(message) {
 export const MissionLoopPlugin = async ({ client, directory }) => ({
   config: async (config) => {
     config.command ??= {};
-    config.command.mission = { description: "Orchestrate a plan or objective; help shows usage, --afk runs unattended",
+    config.command.mission = { description: "Orchestrate a plan or objective; setup installs the runtime, help shows usage, --afk runs unattended",
       template: `Read ${skill} and follow it. Mission arguments: $ARGUMENTS`, agent: "mission" };
     const current = config.permission?.skill;
     config.permission ??= {};
@@ -68,17 +70,22 @@ export const MissionLoopPlugin = async ({ client, directory }) => ({
   },
   "command.execute.before": async (input, output) => {
     if (input.command !== "mission") return;
-    if (["help", "--help", "-h"].includes(input.arguments.trim())) {
+    const args = input.arguments.trim();
+    if (args === "setup") {
+      setupSessions.add(input.sessionID);
+      output.parts = [{ type: "text", text: `Read ${setupFile} and follow it to set up the mission OpenCode runtime: agents, plugins, and a model profile from MODEL_DEFAULTS.md with the user's choices. This is setup only: do not create or modify ledgers, .loop, branches, worker assignments, or mission files, and do not resume an existing mission. Change only the files SETUP.md names, report what changed, and include the restart the user needs.` }];
+    } else if (["help", "--help", "-h"].includes(args)) {
       helpSessions.add(input.sessionID);
       output.parts = [{ type: "text", text: `Read ${helpFile} and explain how to use mission. This is help only: do not create or modify ledgers, .loop, branches, worker assignments, or project files, and do not resume an existing mission. Return after showing help.` }];
     } else {
       helpSessions.delete(input.sessionID);
+      setupSessions.delete(input.sessionID);
     }
   },
   event: async ({ event }) => {
     const id = event?.properties?.sessionID;
     if (event?.type !== "session.idle" || !id) return;
-    if (helpSessions.delete(id)) return;
+    if (helpSessions.delete(id) || setupSessions.delete(id)) return;
     const file = path.join(directory, ".loop");
     if (!existsSync(file) || inFlight.has(file)) return;
     inFlight.add(file);
