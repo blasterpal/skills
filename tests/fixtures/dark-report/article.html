@@ -1,0 +1,132 @@
+<p>Intro with a <a href="https://example.com/source">content link</a>, <strong>strong text</strong>, <em>emphasis</em>, and <code>inline_code()</code>. Unicode: Café, naïve, 日本語, 3 &times; 4 &mdash; all preserved.</p>
+
+<h2 id="keep-me">First heading</h2>
+
+<p>Use <code>&lt;tag&gt;</code> in prose. The first heading keeps its existing ID.</p>
+
+<h3 id="stable">Café &amp; 日本語</h3>
+
+<p>An H3 with an existing stable ID.</p>
+
+<h3>Résumé 日本語</h3>
+
+<p>An H3 with a generated Unicode ID.</p>
+
+<ul>
+  <li>First bullet</li>
+  <li>Second bullet with <strong>strong</strong></li>
+</ul>
+
+<ol>
+  <li>First ordered item</li>
+  <li>Second ordered item</li>
+</ol>
+
+<ul class="task-list">
+  <li><input type="checkbox" checked disabled aria-label="Done item"><span>Done item</span></li>
+  <li><input type="checkbox" disabled aria-label="Open item"><span>Open item</span></li>
+</ul>
+
+<dl>
+  <dt>RT60</dt>
+  <dd>The time for sound to decay by 60 dB.</dd>
+</dl>
+
+<aside class="callout callout--note">
+  <p class="callout-label">Note</p>
+  <p>A note callout.</p>
+</aside>
+
+<aside class="callout callout--tip">
+  <p class="callout-label">Tip</p>
+  <p>A tip callout.</p>
+</aside>
+
+<aside class="callout callout--warn">
+  <p class="callout-label">Warning</p>
+  <p>A warning callout.</p>
+</aside>
+
+<aside class="callout callout--danger">
+  <p class="callout-label">Caution</p>
+  <p>A danger callout.</p>
+</aside>
+
+<h2 id="keep-me">Duplicate id</h2>
+
+<p>The duplicate heading ID is deduplicated.</p>
+
+<div class="table-wrap">
+  <table>
+    <caption>Table 1. A small measurement table.</caption>
+    <thead>
+      <tr>
+        <th scope="col">Condition</th>
+        <th scope="col" class="num">Absorption</th>
+        <th scope="col" class="num">RT60 (s)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Bare room</td>
+        <td class="num">6.2</td>
+        <td class="num">0.75</td>
+      </tr>
+      <tr>
+        <td>Treated room</td>
+        <td class="num">13.4</td>
+        <td class="num">0.35</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<figure class="code">
+  <figcaption class="code-label">python</figcaption>
+  <pre><code><span class="tok-comment"># Sabine estimate</span>
+<span class="tok-keyword">def</span> <span class="tok-function">rt60</span>(volume, absorption):
+    <span class="tok-keyword">return</span> <span class="tok-number">0.161</span> * volume / absorption</code></pre>
+</figure>
+
+<blockquote>
+  <p>A measurement you cannot repeat is a story.</p>
+  <cite>Studio notebook</cite>
+</blockquote>
+
+<div id="third-heading"></div>
+
+<h2>Third heading</h2>
+
+<p>The generated ID avoids the non-heading ID above.</p>
+
+<figure class="figure">
+  <div class="figure-frame">
+    <svg class="diagram" viewBox="0 0 320 180" role="img" aria-labelledby="fixture-fig-title fixture-fig-desc">
+      <title id="fixture-fig-title">A small plan diagram</title>
+      <desc id="fixture-fig-desc">A room outline with a listener and a reflection path.</desc>
+      <rect class="diagram-room" x="10" y="10" width="300" height="160"></rect>
+      <circle class="diagram-dot" cx="160" cy="120" r="6"></circle>
+      <path class="diagram-accent" d="M80 50 L30 90 L160 120"></path>
+      <text x="20" y="30">LEFT WALL</text>
+      <text x="240" y="30">RIGHT WALL</text>
+    </svg>
+  </div>
+  <figcaption>Figure 1. A small plan diagram.</figcaption>
+</figure>
+
+<details class="details" open>
+  <summary>How the measurement was made</summary>
+  <p>With a measurement microphone and a sweep.</p>
+</details>
+
+<hr>
+
+<p>A footnote reference.<sup class="footnote-ref" id="fnref-1"><a href="#fn-1">1</a></sup></p>
+
+<h2 data-toc="false">Notes</h2>
+
+<section class="footnotes" role="doc-endnotes" aria-label="Notes">
+  <ol>
+    <li id="fn-1"><p>A footnote that must survive.</p> <a class="footnote-back" href="#fnref-1" aria-label="Back to text">&#8593;</a></li>
+  </ol>
+</section>

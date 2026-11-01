@@ -1,0 +1,181 @@
+<p>Every small studio has a moment when the next purchase feels obvious. A better converter, a second pair of monitors, one more acoustic panel. The room usually has a different answer. Before the gear list grows, measure what the room is already doing.</p>
+
+<h2>Start with the room</h2>
+
+<p>The room is the <strong>first instrument</strong> in the signal path. It adds a decay tail to every transient, tilts the low end, and decides where the first reflection arrives. You can hear those effects without knowing their names, but naming them makes the next decision cheaper.</p>
+
+<aside class="callout callout--note">
+  <p class="callout-label">Note</p>
+  <p>This is a field note, not a treatment plan. The numbers below describe one room and one listening position.</p>
+</aside>
+
+<h2>Measure before you treat</h2>
+
+<p>Start with a <em>repeatable</em> measurement. A measurement microphone, an audio interface, and a <a href="https://www.roomeqwizard.com/">sweep</a> are enough. The point is not a perfect graph; it is a baseline you can compare after moving a desk or adding a panel.</p>
+
+<ol>
+  <li>Place the microphone at the listening position, at ear height.</li>
+  <li>Measure the empty room with the monitors at their current settings.</li>
+  <li>Save the impulse response and the octave-band decay.</li>
+  <li>Change one thing. Measure again.</li>
+  <li>Keep the change only when the result is audible and repeatable.</li>
+</ol>
+
+<div class="table-wrap">
+  <table>
+    <caption>Table 1. A simple absorption budget for a 3 &times; 4 &times; 2.4 m room.</caption>
+    <thead>
+      <tr>
+        <th scope="col">Condition</th>
+        <th scope="col" class="num">Area (m&sup2;)</th>
+        <th scope="col" class="num">Absorption</th>
+        <th scope="col" class="num">RT60 (s)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Bare room</td>
+        <td class="num">57.6</td>
+        <td class="num">6.2</td>
+        <td class="num">0.75</td>
+      </tr>
+      <tr>
+        <td>Four corner traps</td>
+        <td class="num">57.6</td>
+        <td class="num">9.6</td>
+        <td class="num">0.48</td>
+      </tr>
+      <tr>
+        <td>First reflection panels</td>
+        <td class="num">57.6</td>
+        <td class="num">11.8</td>
+        <td class="num">0.39</td>
+      </tr>
+      <tr>
+        <td>Desk and soft furnishing</td>
+        <td class="num">57.6</td>
+        <td class="num">13.4</td>
+        <td class="num">0.35</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<p>The Sabine estimate is simple: <code>0.161 &times; V / A</code>, where V is the room volume and A is the total absorption.</p>
+
+<figure class="code">
+  <figcaption class="code-label">python</figcaption>
+  <pre><code><span class="tok-comment"># Sabine estimate for a small room</span>
+<span class="tok-keyword">def</span> <span class="tok-function">rt60</span>(volume_m3, absorption_m2):
+    <span class="tok-keyword">return</span> <span class="tok-number">0.161</span> * volume_m3 / absorption_m2
+
+room = <span class="tok-number">3</span> * <span class="tok-number">4</span> * <span class="tok-number">2.4</span>
+<span class="tok-function">print</span>(<span class="tok-function">round</span>(<span class="tok-function">rt60</span>(room, <span class="tok-number">8.5</span>), <span class="tok-number">2</span>))</code></pre>
+</figure>
+
+<aside class="callout callout--warn">
+  <p class="callout-label">Warning</p>
+  <p><a href="https://en.wikipedia.org/wiki/Reverberation#Reverberation_time">RT60</a> is a coarse summary. It hides which frequencies decay slowly. Check the octave bands before you treat a broadband number as a diagnosis.</p>
+</aside>
+
+<h2>The first four inches</h2>
+
+<p>Most small-room problems start close to the microphone and the wall behind the monitors. Move the listening position first; treatment comes after placement.</p>
+
+<h3>Corners</h3>
+
+<p>Corners collect pressure. A trap that spans a corner works on the pressure maximum rather than the velocity maximum. In a small room, two floor-to-ceiling traps often do more than a wall of thin panels.</p>
+
+<h3>The desk</h3>
+
+<p>A desk is a reflective surface between you and the monitors. Pull it away from the wall, lower the monitor height, or tilt the desk. The first reflection from the desk is usually earlier and louder than the one from the side walls.</p>
+
+<h4>A quick mode check</h4>
+
+<p>Calculate the axial modes for the room dimensions. If two modes land within a few hertz of each other, move the listening position before buying another trap.</p>
+
+<aside class="callout callout--tip">
+  <p class="callout-label">Tip</p>
+  <p>Use a piece of tape on the floor to mark the listening position. Move it in 10 cm steps and measure. The best position is often not the one that looks symmetrical.</p>
+</aside>
+
+<h2 id="checklist">A repeatable check</h2>
+
+<figure class="figure">
+  <div class="figure-frame">
+    <svg class="diagram" viewBox="0 0 640 300" role="img" aria-labelledby="fig-title fig-desc">
+      <title id="fig-title">Plan view of a first reflection path</title>
+      <desc id="fig-desc">A room outline with a desk, a listener, two monitors, and a reflection path from the left monitor to the side wall and back to the listener.</desc>
+      <rect class="diagram-room" x="40" y="35" width="560" height="230" rx="2"></rect>
+      <line class="diagram-muted" x1="40" y1="35" x2="40" y2="265"></line>
+      <line class="diagram-muted" x1="600" y1="35" x2="600" y2="265"></line>
+      <rect class="diagram-muted" x="235" y="215" width="170" height="28" rx="2"></rect>
+      <circle class="diagram-dot" cx="320" cy="188" r="7"></circle>
+      <circle class="diagram-dot-muted" cx="245" cy="110" r="6"></circle>
+      <circle class="diagram-dot-muted" cx="395" cy="110" r="6"></circle>
+      <path class="diagram-accent" d="M245 110 L92 172 L320 188"></path>
+      <path class="diagram-muted" d="M395 110 L548 172 L320 188"></path>
+      <line class="diagram-muted" x1="320" y1="188" x2="320" y2="215"></line>
+      <text x="58" y="60">LEFT WALL</text>
+      <text x="494" y="60">RIGHT WALL</text>
+      <text x="286" y="255">DESK</text>
+      <text x="336" y="184">LISTENER</text>
+      <text x="196" y="100">L</text>
+      <text x="403" y="100">R</text>
+      <text x="116" y="152">FIRST REFLECTION</text>
+    </svg>
+  </div>
+  <figcaption>Figure 1. A plan view of the first reflection path. The desk and listener sit off-center; the side-wall reflection arrives later than the desk reflection.</figcaption>
+</figure>
+
+<ul class="task-list">
+  <li><input type="checkbox" checked disabled aria-label="Measure the empty room at the listening position"><span>Measure the empty room at the listening position.</span></li>
+  <li><input type="checkbox" checked disabled aria-label="Save the baseline before changing anything"><span>Save the baseline before changing anything.</span></li>
+  <li><input type="checkbox" checked disabled aria-label="Move one item at a time"><span>Move one item at a time.</span></li>
+  <li><input type="checkbox" disabled aria-label="Keep the change only if the result repeats"><span>Keep the change only if the result repeats.</span></li>
+</ul>
+
+<details class="details" open>
+  <summary>How I measured the room</summary>
+  <ol>
+    <li>A measurement microphone on a boom stand, at ear height.</li>
+    <li>An audio interface with the monitor level marked and left alone.</li>
+    <li>A sweep from 20 Hz to 20 kHz, averaged over three measurements.</li>
+    <li>The same sweep after each change, saved with the date and position.</li>
+  </ol>
+</details>
+
+<blockquote>
+  <p>&ldquo;A measurement you cannot repeat is a story about a room, not a measurement of it.&rdquo;</p>
+  <cite>Studio notebook, March 2026</cite>
+</blockquote>
+
+<aside class="callout callout--danger">
+  <p class="callout-label">Danger</p>
+  <p>Do not judge a change from one sweep. A 3 dB difference can come from a moved microphone, a different monitor level, or a window. Repeat the measurement before you keep the change.</p>
+</aside>
+
+<p><a class="button" href="#checklist">Jump to the checklist</a></p>
+
+<h2>What I would do next</h2>
+
+<p>Treat the room in the order that costs the least and teaches the most: placement, then the desk, then the first reflection points, then the corners. Buy the next piece of gear only after the measurements stop moving.</p>
+
+<ul>
+  <li>Move the listening position before adding treatment.</li>
+  <li>Measure the desk reflection separately from the side walls.</li>
+  <li>Keep a baseline file for every change.</li>
+  <li>Stop when the decay is even enough to trust your mixes.</li>
+</ul>
+
+<hr>
+
+<p>The room will never be neutral. The goal is to know its voice well enough that you stop hearing it on every mix.<sup class="footnote-ref" id="fnref-1"><a href="#fn-1">1</a></sup> That is a different kind of upgrade.<sup class="footnote-ref" id="fnref-2"><a href="#fn-2">2</a></sup></p>
+
+<section class="footnotes" role="doc-endnotes" aria-label="Notes">
+  <h2 class="footnotes-title" data-toc="false">Notes</h2>
+  <ol>
+    <li id="fn-1"><p>&ldquo;Neutral&rdquo; here means a decay that does not favor one octave over another, not a flat magnitude response.</p> <a class="footnote-back" href="#fnref-1" aria-label="Back to text">&#8593;</a></li>
+    <li id="fn-2"><p>The Sabine equation assumes a diffuse field. Small rooms rarely are, so use it as a starting point, not a verdict.</p> <a class="footnote-back" href="#fnref-2" aria-label="Back to text">&#8593;</a></li>
+  </ol>
+</section>
