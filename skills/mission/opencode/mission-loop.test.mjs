@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile, writeFile, mkdtemp, rm, access } from 'node:fs/promises';
+import { readFile, writeFile, mkdtemp, rm, access, symlink, readlink, realpath } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -10,12 +10,16 @@ const defaultMessages = [
   { info: { role: 'user', id: 'user-1', time: { created: 1 }, agent: 'mission', model: { providerID: 'profile-provider', modelID: 'selected-model', variant: 'high' } }, parts: [] },
   { info: { role: 'assistant', id: 'assistant-1', parentID: 'user-1', time: { created: 2 }, agent: 'mission', providerID: 'profile-provider', modelID: 'selected-model', variant: 'high' }, parts: [] },
 ];
-async function fixture(t, { loop = {}, ledger = '- [ ] First batch\n', messages = defaultMessages, parentID, promptError, holdPrompt, holdMessages } = {}) {
-  const directory = await mkdtemp(path.join(os.tmpdir(), 'mission-loop-test-'));
-  const loopFile = path.join(directory, '.loop');
-  const ledgerFile = path.join(directory, 'ledger.md');
+async function fixture(t, { loop = {}, ledger = '- [ ] First batch\n', messages = defaultMessages, parentID, promptError, holdPrompt, holdMessages, external = false, legacy = false } = {}) {
+  const directory = await realpath(await mkdtemp(path.join(os.tmpdir(), 'mission-loop-test-')));
+  const missionDirectory = external ? await realpath(await mkdtemp(path.join(os.tmpdir(), 'mission-home-test-'))) : directory;
+  const filename = legacy ? '.loop' : '.mission-state.json';
+  const loopFile = path.join(missionDirectory, filename);
+  const pointerFile = path.join(directory, filename);
+  const ledgerFile = path.join(missionDirectory, 'ledger.md');
   await writeFile(ledgerFile, ledger);
   await writeFile(loopFile, typeof loop === 'string' ? loop : JSON.stringify({ ledger: 'ledger.md', ...loop }));
+  if (external) await symlink(loopFile, pointerFile);
   const key = `mission-plugin-test-${++sequence}`;
   globalThis[key] = [];
   let source = await readFile(sourcePath, 'utf8');
@@ -40,9 +44,62 @@ async function fixture(t, { loop = {}, ledger = '- [ ] First batch\n', messages 
   };
   const emit = (sessionID = 'root', type = 'session.idle') => plugin.event({ event: { type, properties: { sessionID } } });
   const exists = async () => { try { await access(loopFile); return true; } catch { return false; } };
-  t.after(async () => { delete globalThis[key]; await rm(directory, { recursive: true, force: true }); });
-  return { plugin, calls, emit, restart, loopFile, ledgerFile, exists, directory };
+  const attach = async (otherDirectory) => MissionLoopPlugin({ client, directory: otherDirectory });
+  t.after(async () => {
+    delete globalThis[key];
+    await rm(directory, { recursive: true, force: true });
+    if (external) await rm(missionDirectory, { recursive: true, force: true });
+  });
+  return { plugin, calls, emit, restart, attach, loopFile, pointerFile, ledgerFile, exists, directory };
 }
+
+test('external loop resolves its ledger from the mission directory and persists across reloads', async (t) => {
+  const f = await fixture(t, { external: true, loop: { max_rounds: 1 } });
+  await f.emit();
+  const state = JSON.parse(await readFile(f.loopFile, 'utf8'));
+  assert.equal(state.ledger, f.ledgerFile);
+  assert.equal(state.session, 'root');
+  assert.equal(state.state.rounds, 1);
+  assert.equal(await readlink(f.pointerFile), f.loopFile);
+  await f.restart();
+  await f.emit();
+  assert.equal(await f.exists(), false);
+  assert.equal(await readlink(f.pointerFile), f.loopFile);
+  assert.equal(f.calls.prompts.length, 1);
+});
+
+test('completed external loop is removed while the checkout pointer remains inert', async (t) => {
+  const f = await fixture(t, { external: true, ledger: '- [x] Done — evidence: check → pass\n' });
+  await f.emit();
+  assert.equal(await f.exists(), false);
+  assert.equal(await readlink(f.pointerFile), f.loopFile);
+  await f.emit();
+  assert.equal(f.calls.prompts.length, 0);
+  assert.equal(f.calls.notifications.length, 1);
+  assert.equal(f.calls.logs.length, 0);
+});
+
+test('different worktree pointers serialize continuation through the same external loop', async (t) => {
+  let release;
+  const held = new Promise((resolve) => { release = resolve; });
+  const f = await fixture(t, { external: true, holdPrompt: held });
+  const otherDirectory = await mkdtemp(path.join(os.tmpdir(), 'mission-other-worktree-'));
+  t.after(() => rm(otherDirectory, { recursive: true, force: true }));
+  await symlink(f.loopFile, path.join(otherDirectory, '.mission-state.json'));
+  const other = await f.attach(otherDirectory);
+  const first = f.emit();
+  try {
+    while (!f.calls.prompts.length) await new Promise((resolve) => setImmediate(resolve));
+    await other.event({ event: { type: 'session.idle', properties: { sessionID: 'other-root' } } });
+    assert.equal(f.calls.gets.length, 1);
+  } finally {
+    release();
+    await first;
+  }
+  await other.event({ event: { type: 'session.idle', properties: { sessionID: 'other-root' } } });
+  assert.equal(f.calls.prompts.length, 1);
+  assert.equal(JSON.parse(await readFile(f.loopFile, 'utf8')).session, 'root');
+});
 
 test('mission command selects mission agent and retains skill permissions', async (t) => {
   const f = await fixture(t);
@@ -119,12 +176,31 @@ test('missing execution metadata leaves the loop without choosing a default', as
 });
 
 test('legacy ledger configuration still binds and resumes', async (t) => {
-  const f = await fixture(t, { loop: 'ledger: ledger.md\nmax_rounds: 3\n' });
+  const f = await fixture(t, { legacy: true, loop: 'ledger: ledger.md\nmax_rounds: 3\n' });
   await f.emit();
   const loop = JSON.parse(await readFile(f.loopFile, 'utf8'));
   assert.equal(loop.max_rounds, 3);
   assert.equal(loop.session, 'root');
   assert.equal(f.calls.prompts.length, 1);
+});
+
+test('new mission state takes precedence over a legacy loop', async (t) => {
+  const f = await fixture(t);
+  const legacy = JSON.stringify({ ledger: 'missing-ledger.md', session: 'old-owner' });
+  await writeFile(path.join(f.directory, '.loop'), legacy);
+  await f.emit();
+  assert.equal(f.calls.prompts.length, 1);
+  assert.equal(await readFile(path.join(f.directory, '.loop'), 'utf8'), legacy);
+});
+
+test('an inactive shared-state pointer does not reactivate a legacy loop', async (t) => {
+  const f = await fixture(t, { external: true });
+  await rm(f.loopFile);
+  await writeFile(path.join(f.directory, '.loop'), JSON.stringify({ ledger: f.ledgerFile }));
+  await f.emit();
+  assert.equal(f.calls.gets.length, 0);
+  assert.equal(f.calls.prompts.length, 0);
+  assert.equal(f.calls.logs.length, 0);
 });
 
 test('verified completion removes the loop and notifies without prompting', async (t) => {

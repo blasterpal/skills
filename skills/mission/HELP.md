@@ -25,6 +25,8 @@ no push, publication, or merge into main.
 
 A planning-only request ends at a draft, specification, or ticket breakdown. An implementation request continues through tested code and review. Existing source briefs are preserved rather than overwritten as ledgers.
 
+Before a new mission starts, mission asks where its home should be, suggesting `~/hq/missions/` or a custom directory. This setup question also applies to AFK mode unless you already supplied the location. Each mission gets a unique `<date>-<topic>/` folder outside all code checkouts and worktrees. Ledgers, results, briefs, judge reports, handoffs, and scratch evidence live there; workers receive the same absolute paths. Resuming reuses that directory. Older checkout-local state is moved to an agreed external home before workers resume, leaving a pointer behind.
+
 ## Attended or AFK
 
 | Mode | What it does |
@@ -51,8 +53,8 @@ Workers own separate files or worktrees. Candidate integrations are verified bef
 
 1. The ledger contains tasks, dependencies, model choices, and checks. A completed task includes the exact evidence and observed result. Original user features remain linked to their specification, tickets, and acceptance checks.
 2. `Needs user:` records a pending decision or approval. `BLOCKED:` records an actual mission-wide blocker; an empty or `none` placeholder is not a blocker.
-3. OpenCode’s companion plugin uses the project’s `.loop` file to resume the owning root session on idle. The default cap is 20 continuation rounds; `--max-rounds N` changes it in AFK mode. A round can finish a parallel batch. Two consecutive unchanged rounds stop continuation for lack of progress.
-4. To stop, interrupt the current run, then remove that mission’s project `.loop` file. Keep the ledger and results. Reopen the owning session to continue, or start a new mission with the ledger path after the old loop has stopped. Use `--afk` again if unattended judgment is wanted.
+3. OpenCode’s companion plugin uses `.mission-state.json` in the shared mission directory to resume the owning root session on idle. A symlink of the same name in the launch directory points to that shared file; it contains no separate state. The default cap is 20 continuation rounds; `--max-rounds N` changes it in AFK mode. A round can finish a parallel batch. Two consecutive unchanged rounds stop continuation for lack of progress.
+4. To stop, interrupt the current run, then remove `.mission-state.json` from that mission’s shared directory. The checkout symlink may remain inactive. Keep the ledger and results. Reopen the owning session to continue, or start a new mission with the ledger path after the old loop has stopped. Use `--afk` again if unattended judgment is wanted.
 5. Leave OpenCode running in a persistent TUI/server session for idle continuation. One-shot `opencode run` is not a persistent mission host. Claude Code and Codex follow the workflow during the active turn; they do not use the OpenCode idle plugin.
 
 ## Prerequisites and outputs

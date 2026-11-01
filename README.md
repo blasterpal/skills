@@ -42,6 +42,7 @@ in your clone instead; the links already point to its files.
 | Skill | What it does |
 |---|---|
 | [autonomous](skills/autonomous/SKILL.md) | Complete a multi-step task without routine interruptions. Record judgment calls in one append-only decision file for later human review; required approvals still block the affected action. |
+| [brave-cdp](skills/brave-cdp/SKILL.md) | Attach to an existing Brave CDP session, check readiness, and prompt the user to run the bundled macOS launcher when unavailable. Keep browser workers on the same running Brave. |
 | [convo](skills/convo/SKILL.md) | Experimental: save compressed continuation briefs, optional reasoning memos, and lossless plans. On first use asks where to store conversations and whether to keep personal and work apart; needs nothing else. Profiles can add local conventions per folder. Python 3.9+, no additional packages. |
 | [hashout](skills/hashout/SKILL.md) | Two to five agents in different harnesses (Claude Code, Codex, OpenCode) debate a question in turns through one shared Markdown file until they agree or deadlock, for architecture and design decisions or brainstorming. Can apply another skill (such as a grilling session) and act on the agreed decision. POSIX `sh` and core tools only. |
 | [memorywipe](skills/memorywipe/SKILL.md) | Audit and clean the memory files, instruction chains, and injected context that Claude Code, Codex, or OpenCode load at the start of every session. Finds stale, duplicate, and oversized entries; presents one batched decision set; compresses what survives. |

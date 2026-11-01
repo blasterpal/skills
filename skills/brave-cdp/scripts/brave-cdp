@@ -1,0 +1,171 @@
+#!/usr/bin/env bash
+# brave-cdp — start Brave with CDP on port 9222 for Playwright/MCP attach
+#
+# Usage:
+#   brave-cdp [start]              # isolated profile; prompts to create if missing
+#   brave-cdp [start] --profile Default   # real Brave profile dir (by profile-directory name)
+#   brave-cdp [start] --profile Personal  # same — matches profile display name
+#   brave-cdp status               # check if CDP port is alive
+#   brave-cdp kill                 # kill the CDP process
+#
+# --profile uses ~/Library/.../Brave-Browser/ as user-data-dir.
+# WARNING: Brave must be fully quit first — can't share profile with a running instance.
+#
+# Bundled with the brave-cdp skill for existing-browser attachment.
+
+set -euo pipefail
+
+BRAVE_APP="/Applications/Brave Browser.app"
+BRAVE_REAL_DATA="$HOME/Library/Application Support/BraveSoftware/Brave-Browser"
+CDP_PORT=9222
+DEFAULT_PROFILE_DIR="$HOME/.brave-cdp-profile"
+
+cdp_running() {
+  lsof -iTCP:${CDP_PORT} -sTCP:LISTEN -t >/dev/null 2>&1
+}
+
+brave_running() {
+  pgrep -f "Brave Browser" >/dev/null 2>&1
+}
+
+# Resolve --profile: accepts directory name (Default) or display name (Personal)
+resolve_profile_dir() {
+  local name="$1"
+  # Direct match: "Default", "Profile 1", etc.
+  if [[ -d "$BRAVE_REAL_DATA/$name" ]]; then
+    echo "$name"
+    return
+  fi
+  # Display name match: scan Preferences files
+  for dir in "$BRAVE_REAL_DATA"/Default "$BRAVE_REAL_DATA"/Profile\ */; do
+    [[ -d "$dir" ]] || continue
+    local pref="$dir/Preferences"
+    [[ -f "$pref" ]] || continue
+    local display
+    display=$(python3 -c "import sys,json; p=json.load(open('$pref')); print(p.get('profile',{}).get('name',''))" 2>/dev/null || echo "")
+    if [[ "$display" == "$name" ]]; then
+      echo "$(basename "$dir")"
+      return
+    fi
+  done
+  echo ""
+}
+
+# Parse args: first non-flag arg = subcommand, --profile <name> sets profile
+cmd="start"
+profile_arg=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    status|kill|start)
+      cmd="$1"; shift ;;
+    --profile|-p)
+      profile_arg="${2:-}"; shift 2 ;;
+    --profile=*)
+      profile_arg="${1#--profile=}"; shift ;;
+    *)
+      # bare arg with no known subcommand yet — treat as cmd if it matches
+      if [[ "$1" =~ ^(status|kill|start)$ ]]; then
+        cmd="$1"
+      fi
+      shift ;;
+  esac
+done
+
+case "$cmd" in
+  status)
+    if cdp_running; then
+      pid=$(lsof -iTCP:${CDP_PORT} -sTCP:LISTEN -t | head -1)
+      echo "CDP listening on :${CDP_PORT} (pid ${pid})"
+    else
+      echo "CDP not running on :${CDP_PORT}"
+      exit 1
+    fi
+    ;;
+
+  kill)
+    if cdp_running; then
+      pid=$(lsof -iTCP:${CDP_PORT} -sTCP:LISTEN -t | head -1)
+      kill "$pid" && echo "Killed pid ${pid}"
+    else
+      echo "Nothing running on :${CDP_PORT}"
+    fi
+    ;;
+
+  start|*)
+    if cdp_running; then
+      pid=$(lsof -iTCP:${CDP_PORT} -sTCP:LISTEN -t | head -1)
+      open -a "$BRAVE_APP"
+      echo "CDP already listening on :${CDP_PORT} (pid ${pid}); activated Brave. Attach with:"
+      echo "  localhost:${CDP_PORT}"
+      exit 0
+    fi
+
+    user_data_dir="$DEFAULT_PROFILE_DIR"
+    profile_dir_flag=()
+
+    if [[ -n "$profile_arg" ]]; then
+      resolved=$(resolve_profile_dir "$profile_arg")
+      if [[ -z "$resolved" ]]; then
+        echo "ERROR: profile '$profile_arg' not found in $BRAVE_REAL_DATA" >&2
+        echo "Available profiles:" >&2
+        for d in "$BRAVE_REAL_DATA"/Default "$BRAVE_REAL_DATA"/Profile\ */; do
+          [[ -d "$d" ]] || continue
+          bn="$(basename "$d")"
+          display=$(python3 -c "import sys,json; p=json.load(open('$d/Preferences')); print(p.get('profile',{}).get('name',''))" 2>/dev/null || echo "")
+          echo "  $bn  ($display)" >&2
+        done
+        exit 1
+      fi
+
+      if brave_running; then
+        echo "WARNING: Brave is already running. Using real profile while Brave is open" >&2
+        echo "may cause lock conflicts or data corruption. Quit Brave first." >&2
+        echo ""
+        read -r -p "Continue anyway? [y/N] " confirm
+        [[ "$confirm" =~ ^[Yy]$ ]] || exit 1
+      fi
+
+      user_data_dir="$BRAVE_REAL_DATA"
+      profile_dir_flag=("--profile-directory=$resolved")
+      echo "Using profile: $resolved ($profile_arg) from $BRAVE_REAL_DATA"
+    elif [[ ! -f "$DEFAULT_PROFILE_DIR/Default/Preferences" ]]; then
+      echo "CDP profile is missing or not initialized: $DEFAULT_PROFILE_DIR"
+      echo "This profile must be set up on each Mac."
+      if [[ ! -t 0 ]]; then
+        echo "ERROR: run brave-cdp start in a terminal to create the profile." >&2
+        exit 1
+      fi
+      read -r -p "Create a separate Brave profile for CDP? [y/N] " confirm
+      if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+        echo "Profile creation cancelled."
+        exit 1
+      fi
+      echo "Brave will initialize the profile. Sign in to your sites in the window that opens;"
+      echo "those logins will persist for future brave-cdp runs."
+    fi
+
+    mkdir -p "$user_data_dir"
+
+    echo "Launching Brave with CDP on :${CDP_PORT} ..."
+    open -na "$BRAVE_APP" --args \
+      --remote-debugging-port=${CDP_PORT} \
+      --user-data-dir="$user_data_dir" \
+      ${profile_dir_flag[@]+"${profile_dir_flag[@]}"} \
+      --no-first-run \
+      --no-default-browser-check \
+      >/dev/null 2>&1
+
+    for i in $(seq 1 10); do
+      if cdp_running; then
+        echo "CDP ready on :${CDP_PORT} — attach with:"
+        echo "  localhost:${CDP_PORT}"
+        exit 0
+      fi
+      sleep 0.5
+    done
+
+    echo "ERROR: CDP port ${CDP_PORT} did not open after 5s" >&2
+    exit 1
+    ;;
+esac

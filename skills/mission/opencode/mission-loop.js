@@ -1,5 +1,4 @@
-import { readFile, writeFile, unlink } from "node:fs/promises";
-import { existsSync } from "node:fs";
+import { readFile, writeFile, unlink, realpath, lstat } from "node:fs/promises";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -13,7 +12,7 @@ function loopConfig(raw, directory) {
   const data = raw.trim().startsWith("{")
     ? JSON.parse(raw)
     : Object.fromEntries(raw.split(/\r?\n/).filter(Boolean).map((line) => line.split(/[:=]\s*/, 2)));
-  if (!data.ledger || typeof data.ledger !== "string") throw new Error(".loop needs ledger");
+  if (!data.ledger || typeof data.ledger !== "string") throw new Error("Mission state needs ledger");
   return { ...data, ledger: path.resolve(directory, data.ledger), max_rounds: Number(data.max_rounds ?? 20) };
 }
 async function sameLoop(file, snapshot) {
@@ -70,7 +69,7 @@ export const MissionLoopPlugin = async ({ client, directory }) => ({
     if (input.command !== "mission") return;
     if (["help", "--help", "-h"].includes(input.arguments.trim())) {
       helpSessions.add(input.sessionID);
-      output.parts = [{ type: "text", text: `Read ${helpFile} and explain how to use mission. This is help only: do not create or modify ledgers, .loop, branches, worker assignments, or project files, and do not resume an existing mission. Return after showing help.` }];
+      output.parts = [{ type: "text", text: `Read ${helpFile} and explain how to use mission. This is help only: do not create or modify ledgers, mission state, branches, worker assignments, or project files, and do not resume an existing mission. Return after showing help.` }];
     } else {
       helpSessions.delete(input.sessionID);
     }
@@ -79,14 +78,24 @@ export const MissionLoopPlugin = async ({ client, directory }) => ({
     const id = event?.properties?.sessionID;
     if (event?.type !== "session.idle" || !id) return;
     if (helpSessions.delete(id)) return;
-    const file = path.join(directory, ".loop");
-    if (!existsSync(file) || inFlight.has(file)) return;
+    let file;
+    try {
+      let pointer = path.join(directory, ".mission-state.json");
+      try { await lstat(pointer); }
+      catch (error) { if (error.code === "ENOENT") pointer = path.join(directory, ".loop"); else throw error; }
+      file = await realpath(pointer);
+    }
+    catch (error) {
+      if (error.code !== "ENOENT") await client.app.log({ body: { service: "mission-loop", level: "error", message: String(error) } });
+      return;
+    }
+    if (inFlight.has(file)) return;
     inFlight.add(file);
     try {
       const session = await client.session.get({ path: { id } });
       if (session.error || session.data?.parentID) return;
       let snapshot = await readFile(file, "utf8");
-      const loop = loopConfig(snapshot, directory);
+      const loop = loopConfig(snapshot, path.dirname(file));
       if (loop.session && loop.session !== id) return;
       let messages = null;
       if (!loop.session) {
@@ -99,7 +108,7 @@ export const MissionLoopPlugin = async ({ client, directory }) => ({
           if (!unownedWarnings.has(id)) {
             unownedWarnings.add(id);
             await client.app.log({ body: { service: "mission-loop", level: "warn",
-              message: `Unbound .loop left unchanged: session ${id} did not run the mission agent. Start /mission in its owning session.` } });
+              message: `Unbound mission state left unchanged: session ${id} did not run the mission agent. Start /mission in its owning session.` } });
           }
           return;
         }
@@ -109,7 +118,7 @@ export const MissionLoopPlugin = async ({ client, directory }) => ({
       const state = { rounds: loop.state?.rounds ?? 0, previous: loop.state?.previous ?? null, stalled: loop.state?.stalled ?? 0 };
       if (![state.rounds, state.stalled, loop.max_rounds].every((value) => Number.isSafeInteger(value) && value >= 0)
         || state.previous !== null && (!Number.isSafeInteger(state.previous) || state.previous < 0)) {
-        throw new Error(".loop has invalid round or progress counters");
+        throw new Error("Mission state has invalid round or progress counters");
       }
       state.stalled = state.previous === progress(ledger) ? state.stalled + 1 : 0;
       const reason = stopReason(loop, ledger, state.rounds, state.previous, state.stalled);

@@ -25,7 +25,7 @@ Wayfinder HITL tickets remain open without a genuine human exchange, even if an 
 
 `to-spec` test-boundary confirmation, `to-tickets` breakdown approval, and `tdd` testing choices remain distinguishable from provisional substitutes. A pending mandatory human decision can coexist with useful draft work. Approved planning is required unless the build objective explicitly delegates the relevant low-stakes provisional choices; a judge cannot supply that authorization.
 
-Some skills publish issues, push research branches, open PRs, commit, merge, or close tickets. Apply the mission's existing authorization and repository workflow to each action. Without publication authority, prepare reviewable local drafts in the repository's session workspace and record the missing action. Never label an unapproved proposal `ready-for-agent` or claim that tickets exist before publishing them. Do not close implementation tickets before the repository's completion condition holds.
+Some skills publish issues, push research branches, open PRs, commit, merge, or close tickets. Apply the mission's existing authorization and repository workflow to each action. Without publication authority, prepare reviewable local drafts in the external mission directory and record the missing action. Never label an unapproved proposal `ready-for-agent` or claim that tickets exist before publishing them. Do not close implementation tickets before the repository's completion condition holds.
 
 ## Parallel implementation
 
